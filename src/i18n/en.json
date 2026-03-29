@@ -1,0 +1,233 @@
+{
+  "nav": {
+    "problem": "Problem",
+    "service": "Service",
+    "process": "Process",
+    "demo": "Demo",
+    "demoPanel": "Panel Demo",
+    "demoDashboard": "Dashboard Demo",
+    "pricing": "Pricing",
+    "contact": "Contact"
+  },
+  "hero": {
+    "badge1": "TestOps-based B2B Launch Decision Platform",
+    "badge2": "10 days avg. · From KRW 3M",
+    "headline": "Decide your product launch\nwith data, not gut feeling.",
+    "description": "50 real consumers test your product for 10 days. We deliver a data-driven Go / Conditional Go / No-Go verdict report — saving you from costly launch failures.",
+    "cta": "Request Pilot",
+    "ctaSub": "Limited to first 3 companies · Terms negotiable"
+  },
+  "problem": {
+    "title": "Is this how you decide to launch?",
+    "subtitle": "Most K-Beauty SMB brands face the same situation.",
+    "quotes": [
+      {
+        "text": "We test internally every launch, but results are inconsistent every time.",
+        "source": "Brand A CEO",
+        "detail": "Revenue KRW 500M, Indie brand"
+      },
+      {
+        "text": "We launched a serum and got hit with 'too sticky' reviews — KRW 5M in returns.",
+        "source": "Brand B CEO",
+        "detail": "Revenue KRW 300M, OEM-based"
+      },
+      {
+        "text": "US buyers want consumer test data, but clinical trials are way too expensive...",
+        "source": "Brand C CEO",
+        "detail": "Revenue KRW 800M, Export-focused"
+      }
+    ],
+    "gapTitle": "The Gap in Launch Process",
+    "steps": ["Concept", "Internal Test", "Formula Lock", "Packaging", "Production", "Logistics", "Sales"],
+    "editableLabel": "Editable",
+    "lockedLabel": "Locked · Sunk cost zone",
+    "gapInsight": "By the time you realize the mistake, the point of no return has already passed.",
+    "conclusion": "Nadlemok fills the blind spot between consumer panels and clinical trials — a Pre-Launch verification service."
+  },
+  "solution": {
+    "title": "What is Nadlemok?",
+    "subtitle": "The gateway that guides new products to the right path",
+    "definition": "We have 50-100 target consumers use your product sample for 10 days, then deliver a statistically-backed Go / Conditional Go / No-Go verdict report.",
+    "features": [
+      { "title": "SOP-based Operations", "desc": "Standardized, repeatable tests with comparable results across runs." },
+      { "title": "Panel Tier System", "desc": "Panels matched by age, skin type, habits. History tracking prevents duplicates." },
+      { "title": "Kill Signal Detection", "desc": "Auto-detects critical flaws (irritation, stickiness, odor). 5% warning, 10% No-Go." },
+      { "title": "Full Blind + NDA", "desc": "Unbranded containers. All panelists sign NDAs with legal consequences." }
+    ]
+  },
+  "process": {
+    "title": "How It Works",
+    "subtitle": "From request to report in 10 days. All you need to do is send your sample.",
+    "steps": [
+      { "title": "Panel Selection", "desc": "Select panels matching your product's target demographics." },
+      { "title": "Test Design", "desc": "Design blind HUT with 4-point forced choice scale." },
+      { "title": "Sample & HUT", "desc": "Distribute samples, 10-day real-environment evaluation." },
+      { "title": "AI Validation", "desc": "Auto-filter inconsistent responses by speed and pattern." },
+      { "title": "Statistical Analysis", "desc": "Kill Signal → CI → Pearson → Cohort → Penalty → Verdict" },
+      { "title": "Verdict Report", "desc": "Deliver Go / Conditional Go / No-Go 3-report package." }
+    ],
+    "prep": "Client preparation: 2kg bulk or 60 pre-filled bottles (color/scent finalized)"
+  },
+  "verdict": {
+    "title": "3-Tier Launch Verdict",
+    "items": [
+      {
+        "label": "Go",
+        "labelKo": "Launch Ready",
+        "criteria": "No Kill Signal + Overall satisfaction ≥ 3.2 (4-point scale)",
+        "action": "Proceed to launch with data-backed confidence."
+      },
+      {
+        "label": "Conditional Go",
+        "labelKo": "Conditional",
+        "criteria": "Minor Kill Signal or satisfaction 2.8-3.2 range",
+        "action": "Improvement guide provided. Re-verification recommended."
+      },
+      {
+        "label": "No-Go",
+        "labelKo": "Hold Launch",
+        "criteria": "Kill Signal risk (>10%) or satisfaction < 2.8",
+        "action": "Stopping now saves tens of millions in sunk costs."
+      }
+    ]
+  },
+  "deliverables": {
+    "title": "3-Report Package",
+    "subtitle": "Not just statistics — structured documents designed for each decision stage.",
+    "reports": [
+      {
+        "id": "A",
+        "title": "Executive Summary",
+        "audience": "C-Suite / Decision Makers",
+        "items": ["Should we launch this product now?", "Purchase intent rate", "Top strength & critical flaw", "Immediate action items"],
+        "format": "1-page executive summary"
+      },
+      {
+        "id": "B",
+        "title": "Sensory Analysis",
+        "audience": "Product Dev / Marketing Teams",
+        "items": ["Which flaws cause rejection, by what %", "Key purchase decision factors", "Response differences by skin type/age", "Marketing claim vs. actual experience"],
+        "format": "Detailed report + data appendix"
+      },
+      {
+        "id": "C",
+        "title": "Formulation Brief",
+        "audience": "ODM / OEM Manufacturers",
+        "items": ["'Too sticky' → 'Adjust thickener ratio' — in formulation language", "Priority fixes ranked", "Marketing claim viability", "Written by 14-year OEM expert"],
+        "format": "Ready-to-send manufacturer brief"
+      }
+    ]
+  },
+  "demoPanel": {
+    "title": "Panel Experience",
+    "subtitle": "Preview the evaluation screens used by real consumer panelists.",
+    "screens": [
+      { "title": "Panel Home", "desc": "View active tests and progress status." },
+      { "title": "Product Evaluation", "desc": "Rate texture, scent, irritation on 4-point forced choice scale." },
+      { "title": "Daily Checkpoints", "desc": "Record changes at Day 1, 3, 7, and 14 checkpoints." }
+    ],
+    "highlights": ["Blind container testing", "4-point forced choice", "Day 1/3/7/14 checkpoints", "AI consistency check"]
+  },
+  "demoDashboard": {
+    "title": "Client Dashboard",
+    "subtitle": "Monitor test results in real-time on your dedicated dashboard.",
+    "tabs": [
+      { "title": "Overview", "desc": "Sensory score, risk index, purchase intent at a glance." },
+      { "title": "Sensory Profile", "desc": "Radar chart of absorption, moisture, spreadability, scent, etc." },
+      { "title": "Kill Signal Monitor", "desc": "Real-time tracking of critical flaws — stickiness, scent, irritation." },
+      { "title": "Cohort Analysis", "desc": "Heatmap visualization of responses by age and skin type." }
+    ],
+    "highlights": ["Real-time progress", "Auto Go/CGo/No-Go verdict", "Instant Kill Signal alerts", "Cohort heatmaps"]
+  },
+  "demoBanner": {
+    "title": "Try the Service",
+    "subtitle": "Preview Nadlemok's panel evaluation screens and client dashboard.",
+    "panelTitle": "Panel Experience",
+    "panelDesc": "Preview the product evaluation screens used by real consumer panelists.",
+    "panelCta": "View Panel Screens",
+    "dashboardTitle": "Client Dashboard",
+    "dashboardDesc": "Experience the real-time test result dashboard built for your team.",
+    "dashboardCta": "View Dashboard"
+  },
+  "demoPage": {
+    "backToHome": "← Back to Home"
+  },
+  "cost": {
+    "title": "Before you press the production button, do this math.",
+    "subtitle": "Cost scenario for a single new product",
+    "production": "Avg. cost KRW 3,000 × 10,000 units = KRW 30M in production alone",
+    "nadlemok": "Nadlemok verification: KRW 3M / test (Standard)",
+    "scenarios": [
+      { "verdict": "No-Go", "desc": "Stop before production → Full sunk cost defense", "savings": "KRW 30M+ saved" },
+      { "verdict": "Conditional Go", "desc": "Improvement guide → Successful relaunch", "savings": "Risk minimized" },
+      { "verdict": "Go", "desc": "Data-backed confidence + buyer-ready reports", "savings": "Marketing assets included" }
+    ]
+  },
+  "pricing": {
+    "title": "Service Plans",
+    "plans": [
+      {
+        "name": "Basic",
+        "price": "KRW 2M",
+        "unit": "/ test",
+        "panel": "50 panelists · 10 days",
+        "analysis": "3-step analysis",
+        "output": "Verdict summary report",
+        "target": "Startups · Indie brands",
+        "recommended": false
+      },
+      {
+        "name": "Standard",
+        "price": "KRW 3M",
+        "unit": "/ test",
+        "panel": "50 panelists · 10 days",
+        "analysis": "5-step analysis",
+        "output": "Summary + Detailed report",
+        "target": "SMB cosmetics brands",
+        "recommended": true
+      },
+      {
+        "name": "Premium",
+        "price": "KRW 5M",
+        "unit": "/ test",
+        "panel": "100 panelists · 15 days",
+        "analysis": "9-step deep analysis",
+        "output": "Summary + Detail + Formulation",
+        "target": "Mid-size brands and above",
+        "recommended": false
+      }
+    ],
+    "pilot": "Pilot offer: Discounted Standard plan for the first 3 companies. Contact us for terms."
+  },
+  "whyUs": {
+    "title": "Why Nadlemok?",
+    "subtitle": "The only gateway connecting the market's massive blind spot",
+    "stats": [
+      { "value": "$10.2B", "label": "K-Beauty exports" },
+      { "value": "27,932", "label": "Cosmetics companies" },
+      { "value": "71%", "label": "Instant adoption intent" },
+      { "value": "10 days", "label": "Avg. verification period" }
+    ],
+    "features": [
+      { "title": "Kill Signal Detection", "desc": "Auto-blocks 7 critical flaws before mass production." },
+      { "title": "4-Point Forced Choice", "desc": "Eliminates 'neutral' responses. Clear decisions even with N=50." },
+      { "title": "9-Step Framework", "desc": "Designed by SW architect × cosmetics manufacturing expert." },
+      { "title": "Marketing Assets Included", "desc": "Get verification + launch strategy in one package." }
+    ]
+  },
+  "cta": {
+    "title": "Start Now",
+    "description": "Begin a pilot test with your current or in-development product.\nEven better if the formula isn't finalized yet.",
+    "button": "Request Pilot",
+    "offer": "Limited to first 3 companies · Terms negotiable",
+    "email": "official@linebreakers.co.kr",
+    "phone": "070-8098-7123",
+    "closing": "Products that pass through Nadlemok are chosen by consumers."
+  },
+  "footer": {
+    "company": "LineBreakers Inc.",
+    "ceo": "CEO Sunghyun Lim",
+    "address": "Anyang, Gyeonggi-do, Korea",
+    "closing": "Products that pass through Nadlemok are chosen by consumers."
+  }
+}
