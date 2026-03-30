@@ -45,8 +45,10 @@ export async function updateSession(request: NextRequest) {
   }
 
   // 로그인된 사용자가 auth 페이지 접근 시 대시보드로 리다이렉트
+  // /register/panel은 신규 패널 가입 직후 프로필 설정 페이지이므로 제외
   const isAuth = request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/register')
+    (request.nextUrl.pathname.startsWith('/register') &&
+      request.nextUrl.pathname !== '/register/panel')
 
   if (isAuth && user) {
     // 역할에 따라 리다이렉트

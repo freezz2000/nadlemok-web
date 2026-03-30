@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -12,8 +13,10 @@ const skinConcerns = ['모공', '주름', '색소침착', '여드름', '건조',
 
 export default function PanelProfilePage() {
   const supabase = createClient()
+  const router = useRouter()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState({ zipcode: '', address: '', detail: '' })
   const [form, setForm] = useState({
     gender: '',
     age_group: '',
@@ -25,6 +28,8 @@ export default function PanelProfilePage() {
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -50,6 +55,31 @@ export default function PanelProfilePage() {
         is_sensitive: data.is_sensitive || false,
         current_product: data.current_product || '',
       })
+      setAddress({
+        zipcode: data.address_zipcode || '',
+        address: data.address || '',
+        detail: data.address_detail || '',
+      })
+    }
+  }
+
+  function openPostcode() {
+    function execute() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      new (window as any).daum.Postcode({
+        oncomplete: (data: { zonecode: string; roadAddress: string; jibunAddress: string }) => {
+          setAddress({ zipcode: data.zonecode, address: data.roadAddress || data.jibunAddress, detail: '' })
+        },
+      }).open()
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((window as any).daum?.Postcode) {
+      execute()
+    } else {
+      const script = document.createElement('script')
+      script.src = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js'
+      script.onload = execute
+      document.head.appendChild(script)
     }
   }
 
@@ -75,10 +105,25 @@ export default function PanelProfilePage() {
       id: user.id,
       ...form,
       skin_concern: selectedConcerns.join(', '),
+      address_zipcode: address.zipcode || null,
+      address: address.address || null,
+      address_detail: address.detail || null,
     })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function withdraw() {
+    setWithdrawing(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // 데이터 삭제 없이 비활성 처리
+    await supabase.from('profiles').update({ deactivated_at: new Date().toISOString() }).eq('id', user.id)
+    await supabase.from('panel_profiles').update({ is_available: false }).eq('id', user.id)
+    await supabase.auth.signOut()
+    router.push('/')
   }
 
   return (
@@ -107,6 +152,44 @@ export default function PanelProfilePage() {
               onChange={(e) => setPhone(e.target.value)}
               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
               placeholder="010-0000-0000"
+            />
+          </div>
+
+          {/* 샘플 수취 주소 */}
+          <div>
+            <label className="block text-sm font-medium text-text mb-1.5">
+              샘플 수취 주소
+              <span className="text-text-muted font-normal ml-1">(테스트 제품 발송에 사용됩니다)</span>
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={address.zipcode}
+                readOnly
+                className="w-28 px-3 py-2 border border-border rounded-lg text-sm bg-surface text-text-muted"
+                placeholder="우편번호"
+              />
+              <button
+                type="button"
+                onClick={openPostcode}
+                className="px-4 py-2 border border-navy rounded-lg text-sm text-navy hover:bg-navy/5 transition-colors whitespace-nowrap"
+              >
+                주소 검색
+              </button>
+            </div>
+            <input
+              type="text"
+              value={address.address}
+              readOnly
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-surface text-text-muted mb-2"
+              placeholder="주소 검색 후 자동 입력됩니다"
+            />
+            <input
+              type="text"
+              value={address.detail}
+              onChange={(e) => setAddress((prev) => ({ ...prev, detail: e.target.value }))}
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
+              placeholder="상세주소 입력 (동·호수 등)"
             />
           </div>
 
@@ -214,8 +297,51 @@ export default function PanelProfilePage() {
             <Button onClick={save} loading={saving}>저장</Button>
             {saved && <span className="text-sm text-go">저장되었습니다</span>}
           </div>
+
+          {/* 회원탈퇴 */}
+          <div className="border-t border-border pt-5 mt-2">
+            <button
+              type="button"
+              onClick={() => setShowWithdrawModal(true)}
+              className="text-sm text-text-muted hover:text-nogo underline underline-offset-2 transition-colors"
+            >
+              회원탈퇴
+            </button>
+          </div>
         </div>
       </Card>
+
+      {/* 탈퇴 확인 모달 */}
+      {showWithdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h2 className="text-lg font-bold text-text mb-2">회원탈퇴</h2>
+            <p className="text-sm text-text-muted mb-1">
+              탈퇴하시면 패널 활동이 중단되며 매칭에서 제외됩니다.
+            </p>
+            <p className="text-sm text-text-muted mb-6">
+              입력하신 정보는 법적 보존 의무에 따라 일정 기간 보관됩니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowWithdrawModal(false)}
+                className="flex-1 py-2 rounded-lg border border-border text-sm text-text hover:bg-surface transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={withdraw}
+                disabled={withdrawing}
+                className="flex-1 py-2 rounded-lg bg-nogo text-white text-sm font-medium hover:bg-nogo/90 transition-colors disabled:opacity-50"
+              >
+                {withdrawing ? '처리 중...' : '탈퇴하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

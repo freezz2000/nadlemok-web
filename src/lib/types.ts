@@ -2,7 +2,7 @@
 
 export type UserRole = 'admin' | 'client' | 'panel'
 
-export type ProjectStatus = 'pending' | 'draft' | 'confirmed' | 'recruiting' | 'testing' | 'analyzing' | 'completed' | 'rejected'
+export type ProjectStatus = 'pending' | 'draft' | 'confirmed' | 'approved' | 'recruiting' | 'testing' | 'analyzing' | 'completed' | 'rejected'
 
 export type SurveyStatus = 'draft' | 'active' | 'closed'
 
@@ -31,6 +31,11 @@ export interface PanelProfile {
   current_product?: string
   tier: string
   is_available: boolean
+  terms_agreed_at?: string
+  terms_marketing_agreed?: boolean
+  address_zipcode?: string
+  address?: string
+  address_detail?: string
 }
 
 export type QuestionGroup = 'killsignal' | 'usage' | 'function' | 'claim_risk' | 'verification' | 'overall'
@@ -38,9 +43,10 @@ export type QuestionGroup = 'killsignal' | 'usage' | 'function' | 'claim_risk' |
 export interface SurveyQuestion {
   key: string
   label: string
-  type: 'scale' | 'text'
+  type: 'scale' | 'text' | 'choice'
   scale?: number
   scaleLabels?: string[]  // 4점 각각의 답변 설명 (예: ['전혀 아니다', '아니다', '그렇다', '매우 그렇다'])
+  choices?: string[]      // 객관식 선택지 목록
   isKillSignal: boolean
   group?: QuestionGroup
   order: number
@@ -113,40 +119,56 @@ export interface AnalysisResult {
   verdict: Verdict
   summary: {
     satisfaction_mean: number
-    satisfaction_sd: number
-    satisfaction_ci_lower: number
-    satisfaction_ci_upper: number
+    satisfaction_sd?: number
+    satisfaction_ci_lower?: number
+    satisfaction_ci_upper?: number
     purchase_intent_mean: number
     recommend_mean: number
-    vs_existing_mean: number
+    recommend_top2_ratio?: number   // 추천 의향 Top-2 비율 (0~1)
+    vs_existing_mean?: number
     total_responses: number
   }
   item_analysis: {
     name: string
     mean: number
-    sd: number
-    ci_lower: number
-    ci_upper: number
-    kill_signal_ratio: number
-    negative_ratio: number
-    correlation_r: number
-    penalty: number
-    note: string
+    sd?: number
+    ci_lower?: number
+    ci_upper?: number
+    kill_signal_ratio?: number
+    negative_ratio?: number
+    correlation_r?: number          // 구매의향과의 피어슨 r
+    penalty?: number
+    note?: string
+    is_strength?: boolean           // CI lower > 만족도 기준점
+    is_weakness?: boolean           // CI lower < 만족도 기준점
   }[]
   cohort_analysis: {
     skin_type: string
     satisfaction: number
     purchase: number
     recommend: number
-    vs_existing: number
+    vs_existing?: number
     count: number
   }[]
   kill_signals: {
     name: string
+    label?: string
     ratio: number
+    triggered?: number
     level: 'safe' | 'warning' | 'danger'
+    ci_lower?: number
+    ci_upper?: number
+    comment?: string                // 예: "극소수 민감성 반응으로 허용 범위 내"
   }[]
   success_model: {
+    name?: string
+    score?: number
+    weight?: number
+    weighted?: number
+    top5_drivers?: string[]
+    cv_r2?: number
+    reliability_alpha?: number
+  } | {
     name: string
     score: number
     weight: number
@@ -156,5 +178,35 @@ export interface AnalysisResult {
   core_usp?: string
   max_penalty?: string
   recommended_action?: string
+  // 확장 필드 (Python 분석 결과)
+  key_drivers?: {
+    label: string
+    pearson_r: number
+    rank: number
+  }[]
+  rd_guide?: {
+    dont: string[]
+    do: string[]
+    objective?: string              // 처방 목표
+  }
+  marketing_guide?: {
+    targeting: string
+    channel: string
+    message?: string
+  }
+  next_steps?: {
+    step: number
+    title: string
+    description: string
+  }[]
+  age_cohort?: {
+    group_a_label: string
+    group_a_mean: number
+    group_b_label: string
+    group_b_mean: number
+    p_value: number
+    is_significant: boolean
+    insight: string
+  }
   analyzed_at: string
 }
