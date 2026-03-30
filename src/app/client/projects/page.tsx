@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Card from '@/components/ui/Card'
-import { StatusBadge, VerdictBadge } from '@/components/ui/Badge'
+import { StatusBadge } from '@/components/ui/Badge'
 import Link from 'next/link'
 import type { Project, ProjectStatus } from '@/lib/types'
 

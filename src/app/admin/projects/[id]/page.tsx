@@ -157,11 +157,17 @@ export default function ProjectDetailPage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <CardTitle>설문</CardTitle>
-          <Button size="sm" variant="secondary" onClick={() => setShowCreateSurvey(true)}>설문 추가</Button>
+          {project.status !== 'confirmed' && project.status !== 'recruiting' && project.status !== 'testing' && project.status !== 'analyzing' && project.status !== 'completed' && (
+            <Button size="sm" variant="secondary" onClick={() => setShowCreateSurvey(true)}>설문 추가</Button>
+          )}
         </div>
 
         {surveys.length === 0 ? (
-          <p className="text-sm text-text-muted py-4">아직 설문이 없습니다. 설문을 추가해주세요.</p>
+          project.status === 'draft' ? (
+            <p className="text-sm text-text-muted py-4 text-center">고객이 설문을 설정 중입니다. 설문 확정 후 패널 매칭이 가능합니다.</p>
+          ) : (
+            <p className="text-sm text-text-muted py-4">아직 설문이 없습니다. 설문을 추가해주세요.</p>
+          )
         ) : (
           <Table>
             <TableHeader>

@@ -59,11 +59,14 @@ async function RecentProjects() {
   }
 
   const statusLabels: Record<string, string> = {
-    draft: '초안',
+    pending: '승인 대기',
+    draft: '설문 설정중',
+    confirmed: '설문 확정',
     recruiting: '패널 모집중',
     testing: '테스트 진행중',
     analyzing: '분석중',
     completed: '완료',
+    rejected: '반려',
   }
 
   return (
@@ -75,7 +78,7 @@ async function RecentProjects() {
             <p className="text-xs text-text-muted">{p.plan?.toUpperCase()} / 패널 {p.panel_size}명</p>
           </div>
           <span className="text-xs px-2 py-1 rounded bg-surface text-text-muted">
-            {statusLabels[p.status] || p.status}
+            {statusLabels[p.status] ?? p.status}
           </span>
         </div>
       ))}

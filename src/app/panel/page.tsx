@@ -46,7 +46,7 @@ export default async function PanelHome() {
                   <div>
                     <p className="text-sm font-medium text-text">{m.survey?.title}</p>
                     <p className="text-xs text-text-muted mt-1">
-                      {m.survey?.project?.product_name} / 체크포인트: Day {m.survey?.day_checkpoint?.join(', ')}
+                      {m.survey?.project?.product_name}
                     </p>
                   </div>
                   <MatchStatusBadge status={m.status as PanelMatchStatus} />
