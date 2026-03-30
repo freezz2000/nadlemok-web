@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/ui/Badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import Modal from '@/components/ui/Modal'
 import Link from 'next/link'
+import { CATEGORIES, PRODUCT_LINES } from '@/lib/template-constants'
 import type { Project, ProjectStatus, ServicePlan } from '@/lib/types'
 
 export default function ProjectsPage() {
@@ -17,7 +18,8 @@ export default function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
     product_name: '',
-    product_category: '스킨케어',
+    product_category: '화장품',
+    product_line: '',
     plan: 'standard' as ServicePlan,
     panel_size: 50,
     test_duration: 10,
@@ -35,7 +37,13 @@ export default function ProjectsPage() {
   }
 
   async function createProject() {
-    const { error } = await supabase.from('projects').insert(form)
+    const { product_line, ...rest } = form
+    const payload = {
+      ...rest,
+      product_category: product_line ? `${form.product_category} > ${product_line}` : form.product_category,
+      status: 'pending',
+    }
+    const { error } = await supabase.from('projects').insert(payload)
     if (!error) {
       setShowCreate(false)
       loadProjects()
@@ -109,15 +117,29 @@ export default function ProjectsPage() {
             <label className="block text-sm font-medium text-text mb-1.5">제품 카테고리</label>
             <select
               value={form.product_category}
-              onChange={(e) => setForm({ ...form, product_category: e.target.value })}
+              onChange={(e) => setForm({ ...form, product_category: e.target.value, product_line: '' })}
               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
             >
-              <option>스킨케어</option>
-              <option>메이크업</option>
-              <option>바디케어</option>
-              <option>헤어케어</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
           </div>
+          {(PRODUCT_LINES[form.product_category]?.length ?? 0) > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-text mb-1.5">제품군</label>
+              <select
+                value={form.product_line}
+                onChange={(e) => setForm({ ...form, product_line: e.target.value })}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
+              >
+                <option value="">선택 안 함</option>
+                {PRODUCT_LINES[form.product_category].map((pl) => (
+                  <option key={pl} value={pl}>{pl}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-text mb-2">서비스 플랜</label>
             <div className="grid grid-cols-3 gap-3">

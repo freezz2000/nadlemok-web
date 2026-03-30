@@ -13,7 +13,7 @@ export default async function AdminDashboard() {
     supabase.from('projects').select('*', { count: 'exact', head: true }),
     supabase.from('panel_profiles').select('*', { count: 'exact', head: true }),
     supabase.from('survey_templates').select('*', { count: 'exact', head: true }),
-    supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['recruiting', 'testing']),
+    supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['confirmed', 'recruiting', 'testing', 'analyzing']),
   ])
 
   const stats = [
