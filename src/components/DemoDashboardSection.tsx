@@ -203,16 +203,18 @@ const DEMO = {
 }
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────
-export default function DemoDashboardSection() {
+export default function DemoDashboardSection({ hideHeader }: { hideHeader?: boolean } = {}) {
   return (
-    <section id="demo-dashboard" className="py-24 bg-surface">
+    <section id="demo-dashboard" className={hideHeader ? 'py-4' : 'py-24 bg-surface'}>
       <div className="max-w-4xl mx-auto px-6">
 
         {/* 섹션 제목 */}
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold text-navy mb-3">고객 결과 대시보드 체험</h2>
-          <p className="text-text-muted">실제 분석 완료 후 고객에게 제공되는 결과 화면입니다.</p>
-        </div>
+        {!hideHeader && (
+          <div className="text-center mb-10">
+            <h2 className="text-3xl md:text-4xl font-bold text-navy mb-3">고객 대시보드 체험(분석결과)</h2>
+            <p className="text-text-muted">실제 분석 완료 후 고객에게 제공되는 결과 화면입니다.</p>
+          </div>
+        )}
 
         {/* ── 보고서 헤더 ── */}
         <div className="mb-8">

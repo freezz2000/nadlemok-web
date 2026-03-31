@@ -1,17 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { CATEGORIES, PRODUCT_LINES, AVAILABLE_CATEGORIES } from '@/lib/template-constants'
 import type { ServicePlan } from '@/lib/types'
 
+const PLAN_AMOUNT: Record<ServicePlan, number> = {
+  basic: 2_000_000,
+  standard: 3_000_000,
+  premium: 5_000_000,
+}
+
 export default function ServiceApplyPage() {
-  const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
     product_name: '',
     product_category: '화장품',
@@ -21,36 +26,62 @@ export default function ServiceApplyPage() {
   })
 
   const plans: { value: ServicePlan; name: string; price: string; detail: string }[] = [
-    { value: 'basic', name: 'Basic', price: '200만원', detail: '50명 / 10일 / 3단계 분석' },
+    { value: 'basic',    name: 'Basic',    price: '200만원', detail: '50명 / 10일 / 3단계 분석' },
     { value: 'standard', name: 'Standard', price: '300만원', detail: '50명 / 10일 / 5단계 분석' },
-    { value: 'premium', name: 'Premium', price: '500만원', detail: '100명 / 15일 / 9단계 분석' },
+    { value: 'premium',  name: 'Premium',  price: '500만원', detail: '100명 / 15일 / 9단계 분석' },
   ]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
     setLoading(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setError('로그인이 필요합니다.'); setLoading(false); return }
 
-    const planConfig = { basic: { panel: 50, duration: 10 }, standard: { panel: 50, duration: 10 }, premium: { panel: 100, duration: 15 } }
+      // 폼 데이터 임시 저장 (결제 성공 후 프로젝트 생성에 사용)
+      const pendingData = {
+        product_name: form.product_name,
+        product_category: form.product_line
+          ? `${form.product_category} > ${form.product_line}`
+          : form.product_category,
+        plan: form.plan,
+        notes: form.notes,
+        user_id: user.id,
+      }
+      localStorage.setItem('pending_apply', JSON.stringify(pendingData))
 
-    const { error } = await supabase.from('projects').insert({
-      client_id: user.id,
-      product_name: form.product_name,
-      product_category: form.product_line
-        ? `${form.product_category} > ${form.product_line}`
-        : form.product_category,
-      plan: form.plan,
-      panel_size: planConfig[form.plan].panel,
-      test_duration: planConfig[form.plan].duration,
-      status: 'pending',
-    })
+      const orderId = `nadlemok-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const amount = PLAN_AMOUNT[form.plan]
 
-    if (!error) {
-      window.location.href = '/client/projects'
+      // 토스페이먼츠 SDK 동적 로드
+      const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk')
+      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY
+      if (!clientKey || clientKey === 'test_ck_placeholder') {
+        setError('결제 키가 설정되지 않았습니다. 관리자에게 문의하세요.')
+        setLoading(false)
+        return
+      }
+
+      const toss = await loadTossPayments(clientKey)
+      const payment = toss.payment({ customerKey: user.id })
+
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: { currency: 'KRW', value: amount },
+        orderId,
+        orderName: `나들목 ${plans.find(p => p.value === form.plan)?.name} 플랜 — ${form.product_name}`,
+        successUrl: `${window.location.origin}/payment/success`,
+        failUrl: `${window.location.origin}/payment/fail`,
+        customerEmail: user.email ?? undefined,
+      })
+
+    } catch (err) {
+      console.error('결제 오류:', err)
+      setError('결제 중 오류가 발생했습니다. 다시 시도해주세요.')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -162,8 +193,22 @@ export default function ServiceApplyPage() {
           />
         </Card>
 
+        {/* 결제 금액 요약 */}
+        <div className="flex items-center justify-between px-1 mb-4">
+          <span className="text-sm text-text-muted">결제 금액</span>
+          <span className="text-lg font-bold text-navy">
+            {PLAN_AMOUNT[form.plan].toLocaleString()}원
+          </span>
+        </div>
+
+        {error && (
+          <p className="text-sm text-nogo bg-nogo/5 border border-nogo/20 rounded-lg px-4 py-3 mb-4">
+            {error}
+          </p>
+        )}
+
         <Button type="submit" loading={loading} className="w-full" size="lg">
-          신청하기
+          신청 및 결제하기
         </Button>
       </form>
     </div>

@@ -10,6 +10,7 @@ export const config = {
     '/admin/:path*',
     '/client/:path*',
     '/panel/:path*',
+    '/payment/:path*',
     '/login',
     '/register/:path*',
     '/admin-login',

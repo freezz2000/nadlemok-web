@@ -8,6 +8,19 @@ export type SurveyStatus = 'draft' | 'active' | 'closed'
 
 export type PanelMatchStatus = 'matched' | 'accepted' | 'completed' | 'dropped'
 
+export interface Payment {
+  id: string
+  user_id: string
+  project_id?: string
+  order_id: string
+  payment_key?: string
+  amount: number
+  plan: ServicePlan
+  status: 'DONE' | 'CANCELED' | 'FAILED'
+  paid_at?: string
+  created_at: string
+}
+
 export type Verdict = 'GO' | 'CONDITIONAL GO' | 'NO-GO'
 
 export type ServicePlan = 'basic' | 'standard' | 'premium'

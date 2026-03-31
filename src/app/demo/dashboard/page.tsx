@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { I18nProvider, useTranslation } from "@/i18n/useTranslation";
 import Header from "@/components/Header";
-import DemoDashboardSection from "@/components/DemoDashboardSection";
+import ClientDemoSection from "@/components/ClientDemoSection";
 import Footer from "@/components/Footer";
 
 function BackLink() {
@@ -25,7 +25,7 @@ export default function DemoDashboardPage() {
       <Header />
       <main>
         <BackLink />
-        <DemoDashboardSection />
+        <ClientDemoSection />
       </main>
       <Footer />
     </I18nProvider>

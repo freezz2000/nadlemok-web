@@ -35,7 +35,8 @@ export async function updateSession(request: NextRequest) {
   // 보호된 라우트 체크
   const isDashboard = request.nextUrl.pathname.startsWith('/admin') ||
     request.nextUrl.pathname.startsWith('/client') ||
-    request.nextUrl.pathname.startsWith('/panel')
+    request.nextUrl.pathname.startsWith('/panel') ||
+    request.nextUrl.pathname.startsWith('/payment')
 
   if (isDashboard && !user) {
     const url = request.nextUrl.clone()
