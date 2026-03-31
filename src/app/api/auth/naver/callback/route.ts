@@ -47,9 +47,13 @@ export async function GET(req: NextRequest) {
   const profileData = await profileRes.json()
   const naverUser = profileData.response
 
-  if (!naverUser?.email) {
-    return NextResponse.redirect(new URL('/login?error=naver_no_email', origin))
+  if (!naverUser?.id) {
+    return NextResponse.redirect(new URL('/login?error=naver_failed', origin))
   }
+
+  // 이메일 없으면 네이버 고유 ID 기반 synthetic email 사용
+  const email = naverUser.email || `naver_${naverUser.id}@naver.nadlemok.app`
+  const name = naverUser.name ?? naverUser.nickname ?? ''
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,7 +65,7 @@ export async function GET(req: NextRequest) {
   // 3. 매직링크 생성 시도 (사용자가 이미 존재하면 성공)
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
     type: 'magiclink',
-    email: naverUser.email,
+    email,
     options: { redirectTo: callbackUrl },
   })
 
@@ -71,12 +75,9 @@ export async function GET(req: NextRequest) {
 
   // 4. 사용자 없으면 신규 생성 후 재시도
   const { data: newUserData, error: createError } = await supabase.auth.admin.createUser({
-    email: naverUser.email,
+    email,
     email_confirm: true,
-    user_metadata: {
-      full_name: naverUser.name ?? naverUser.nickname ?? '',
-      provider: 'naver',
-    },
+    user_metadata: { full_name: name, provider: 'naver' },
   })
 
   if (createError || !newUserData.user) {
@@ -84,17 +85,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=naver_failed', origin))
   }
 
-  // 프로필 role 설정
   await supabase.from('profiles').upsert({
     id: newUserData.user.id,
     role,
-    name: naverUser.name ?? naverUser.nickname ?? '',
+    name,
   })
 
   // 5. 신규 사용자 매직링크 재생성
   const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
     type: 'magiclink',
-    email: naverUser.email,
+    email,
     options: { redirectTo: callbackUrl },
   })
 

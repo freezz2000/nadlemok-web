@@ -1,18 +1,30 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 
+const errorMessages: Record<string, string> = {
+  oauth: '소셜 로그인에 실패했습니다. 다시 시도해주세요.',
+  naver_failed: '네이버 로그인에 실패했습니다. 다시 시도해주세요.',
+  naver_no_email: '네이버 계정에서 이메일 정보를 가져올 수 없습니다.',
+}
+
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const errorCode = searchParams.get('error')
+    if (errorCode) setError(errorMessages[errorCode] ?? '로그인 중 오류가 발생했습니다.')
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
