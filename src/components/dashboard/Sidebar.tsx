@@ -50,11 +50,21 @@ export default function Sidebar({ role, isOpen = false, onClose }: SidebarProps)
     <aside className={`w-64 h-screen bg-navy text-white flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
       ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-white/10">
+      <div className="px-4 py-5 border-b border-white/10 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-xl font-bold text-gold">나들목</span>
           <span className="text-xs text-white/60 bg-white/10 px-2 py-0.5 rounded">{roleLabels[role]}</span>
         </Link>
+        {/* 모바일 닫기 버튼 */}
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          aria-label="메뉴 닫기"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
       </div>
 
       {/* Navigation */}
