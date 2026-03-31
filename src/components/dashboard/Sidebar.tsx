@@ -36,12 +36,19 @@ const roleLabels: Record<UserRole, string> = {
   panel: '패널',
 }
 
-export default function Sidebar({ role }: { role: UserRole }) {
+interface SidebarProps {
+  role: UserRole
+  isOpen?: boolean
+  onClose?: () => void
+}
+
+export default function Sidebar({ role, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const items = navItems[role]
 
   return (
-    <aside className="w-64 h-screen bg-navy text-white flex flex-col fixed left-0 top-0 z-40">
+    <aside className={`w-64 h-screen bg-navy text-white flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
+      ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
       {/* Logo */}
       <div className="px-6 py-5 border-b border-white/10">
         <Link href="/" className="flex items-center gap-2">
@@ -59,6 +66,7 @@ export default function Sidebar({ role }: { role: UserRole }) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
                 ${isActive
                   ? 'bg-white/15 text-white font-medium'
