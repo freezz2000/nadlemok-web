@@ -12,24 +12,18 @@ export default function SocialAuthPage() {
   useEffect(() => {
     const role = searchParams.get('role') ?? 'panel'
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event !== 'SIGNED_IN' || !session?.user) return
-      subscription.unsubscribe()
-
-      const user = session.user
-
-      // 프로필 role 없으면 설정
+    async function handleRedirect(userId: string) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single()
 
       if (!profile?.role) {
         await supabase.from('profiles').upsert({
-          id: user.id,
+          id: userId,
           role,
-          name: user.user_metadata?.full_name ?? '',
+          name: '',
         })
       }
 
@@ -39,7 +33,7 @@ export default function SocialAuthPage() {
         const { data: panelProfile } = await supabase
           .from('panel_profiles')
           .select('id, skin_type')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single()
 
         router.push(panelProfile?.skin_type ? '/panel' : '/register/panel')
@@ -48,18 +42,37 @@ export default function SocialAuthPage() {
       } else {
         router.push('/')
       }
-    })
-
-    // 3초 내 SIGNED_IN 없으면 실패 처리
-    const timer = setTimeout(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) router.push('/login?error=oauth')
-    }, 3000)
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timer)
     }
+
+    async function init() {
+      // 1. URL hash에 access_token이 있으면 (implicit flow - Supabase magic link)
+      const hash = window.location.hash
+      if (hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.substring(1))
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token') ?? ''
+
+        if (access_token) {
+          const { data, error } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (!error && data.user) {
+            await handleRedirect(data.user.id)
+            return
+          }
+        }
+      }
+
+      // 2. 이미 로그인된 세션이 있으면 바로 처리
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await handleRedirect(user.id)
+        return
+      }
+
+      // 3. 모두 실패하면 로그인 페이지로
+      router.push('/login?error=oauth')
+    }
+
+    init()
   }, [])
 
   return (
