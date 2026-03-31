@@ -1,2 +1,6 @@
 name = "nadlemok-web"
 compatibility_date = "2025-09-27"
+main = "src/index.ts"
+
+[assets]
+directory = ".next/static"

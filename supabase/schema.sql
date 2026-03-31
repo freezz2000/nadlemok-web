@@ -37,6 +37,7 @@ CREATE TABLE profiles (
   name TEXT NOT NULL,
   company TEXT,
   phone TEXT,
+  last_login_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -50,7 +51,9 @@ CREATE TABLE panel_profiles (
   is_sensitive BOOLEAN DEFAULT false,
   current_product TEXT,
   tier TEXT DEFAULT 'basic' CHECK (tier IN ('basic', 'standard', 'premium')),
-  is_available BOOLEAN DEFAULT true
+  is_available BOOLEAN DEFAULT true,
+  address TEXT,
+  address_detail TEXT
 );
 
 -- 3. 설문 템플릿
@@ -74,8 +77,8 @@ CREATE TABLE projects (
   plan TEXT CHECK (plan IN ('basic', 'standard', 'premium')),
   panel_size INT DEFAULT 50,
   test_duration INT DEFAULT 10,
-  status TEXT DEFAULT 'draft' CHECK (status IN (
-    'draft', 'recruiting', 'testing', 'analyzing', 'completed'
+  status TEXT DEFAULT 'pending' CHECK (status IN (
+    'pending', 'draft', 'confirmed', 'approved', 'recruiting', 'testing', 'analyzing', 'completed', 'rejected'
   )),
   ks_warn_threshold NUMERIC DEFAULT 0.05,
   ks_danger_threshold NUMERIC DEFAULT 0.10,
@@ -174,6 +177,7 @@ CREATE POLICY "Admins can manage templates" ON survey_templates FOR ALL USING (g
 
 -- projects
 CREATE POLICY "Clients can read own projects" ON projects FOR SELECT USING (client_id = auth.uid());
+CREATE POLICY "Clients can update own projects" ON projects FOR UPDATE USING (client_id = auth.uid());
 CREATE POLICY "Admins can manage all projects" ON projects FOR ALL USING (get_user_role() = 'admin');
 
 -- surveys

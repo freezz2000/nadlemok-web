@@ -62,7 +62,7 @@ export default function SurveyResponsePage() {
         const restored: Record<string, number | string> = {}
         if (existing.responses) {
           for (const [key, val] of Object.entries(existing.responses)) {
-            restored[key] = val as number
+            restored[key] = val as number | string
           }
         }
         if (existing.open_weakness) restored['open_weakness'] = existing.open_weakness
@@ -91,6 +91,10 @@ export default function SurveyResponsePage() {
     for (const q of survey.questions) {
       if (q.type === 'scale') {
         scaleResponses[q.key] = (responses[q.key] as number) || 0
+      } else if (q.type === 'choice') {
+        if (responses[q.key] !== undefined) {
+          scaleResponses[q.key] = responses[q.key] as unknown as number
+        }
       } else if (q.key === 'open_weakness') {
         openWeakness = (responses[q.key] as string) || ''
       } else if (q.key === 'open_improvement') {
@@ -141,6 +145,7 @@ export default function SurveyResponsePage() {
 
   const scaleQuestions = survey.questions.filter((q) => q.type === 'scale')
   const textQuestions = survey.questions.filter((q) => q.type === 'text')
+  const choiceQuestions = survey.questions.filter((q) => q.type === 'choice')
   const answeredCount = scaleQuestions.filter((q) => responses[q.key] !== undefined).length
   const progress = scaleQuestions.length > 0 ? Math.round((answeredCount / scaleQuestions.length) * 100) : 0
 
@@ -212,6 +217,38 @@ export default function SurveyResponsePage() {
           </Card>
         ))}
       </div>
+
+      {/* 객관식 문항 */}
+      {choiceQuestions.length > 0 && (
+        <div className="mt-6 space-y-4">
+          {choiceQuestions.map((q, i) => (
+            <Card key={q.key} padding="md">
+              <div className="flex items-start gap-2 mb-3">
+                <span className="text-sm text-text-muted">{scaleQuestions.length + i + 1}.</span>
+                <p className="text-sm font-medium text-text flex-1">{q.label}</p>
+              </div>
+              <div className="ml-5 space-y-2">
+                {(q.choices || []).map((choice) => (
+                  <button
+                    key={choice}
+                    onClick={() => !isReadOnly && setResponses({ ...responses, [q.key]: choice })}
+                    disabled={isReadOnly}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm border transition-all ${
+                      responses[q.key] === choice
+                        ? 'bg-navy text-white border-navy font-medium'
+                        : isReadOnly
+                          ? 'border-border text-text-muted/50 cursor-not-allowed'
+                          : 'border-border hover:border-navy/30 text-text'
+                    }`}
+                  >
+                    {choice}
+                  </button>
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* 주관식 문항 */}
       {textQuestions.length > 0 && (

@@ -13,7 +13,7 @@ export default async function AdminDashboard() {
     supabase.from('projects').select('*', { count: 'exact', head: true }),
     supabase.from('panel_profiles').select('*', { count: 'exact', head: true }),
     supabase.from('survey_templates').select('*', { count: 'exact', head: true }),
-    supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['confirmed', 'recruiting', 'testing', 'analyzing']),
+    supabase.from('projects').select('*', { count: 'exact', head: true }).in('status', ['confirmed', 'approved', 'recruiting', 'testing', 'analyzing']),
   ])
 
   const stats = [
@@ -61,7 +61,8 @@ async function RecentProjects() {
   const statusLabels: Record<string, string> = {
     pending: '승인 대기',
     draft: '설문 설정중',
-    confirmed: '설문 확정',
+    confirmed: '관리자 확정',
+    approved: '고객 승인완료',
     recruiting: '패널 모집중',
     testing: '테스트 진행중',
     analyzing: '분석중',

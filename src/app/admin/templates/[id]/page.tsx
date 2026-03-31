@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal'
 import * as XLSX from 'xlsx'
 import { CATEGORIES, PRODUCT_LINES, AVAILABLE_CATEGORIES, QUESTION_GROUPS, DEFAULT_SCALE_LABELS, getGroupConfig } from '@/lib/template-constants'
 import type { SurveyTemplate, SurveyQuestion, QuestionGroup } from '@/lib/types'
+import SurveyQuestionCard from '@/components/SurveyQuestionCard'
 
 export default function TemplateEditPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,7 +20,7 @@ export default function TemplateEditPage() {
   const [saving, setSaving] = useState(false)
   const [showAddQuestion, setShowAddQuestion] = useState(false)
   const [newGroup, setNewGroup] = useState<QuestionGroup>('usage')
-  const [expandedScale, setExpandedScale] = useState<string | null>(null)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   useEffect(() => { loadTemplate() }, [id])
 
@@ -155,6 +156,21 @@ export default function TemplateEditPage() {
     setShowAddQuestion(false)
   }
 
+  function addChoiceQuestion() {
+    if (!template) return
+    const newQ: SurveyQuestion = {
+      key: `choice_${Date.now()}`,
+      label: '',
+      type: 'choice',
+      choices: ['예', '아니오'],
+      isKillSignal: false,
+      group: 'overall',
+      order: template.questions.length + 1,
+    }
+    setTemplate({ ...template, questions: [...template.questions, newQ] })
+    setShowAddQuestion(false)
+  }
+
   function updateQuestion(index: number, updates: Partial<SurveyQuestion>) {
     if (!template) return
     const questions = [...template.questions]
@@ -282,13 +298,13 @@ export default function TemplateEditPage() {
             </div>
             <div className="space-y-2">
               {group.questions.map((q) => (
-                <QuestionCard
+                <SurveyQuestionCard
                   key={q.key}
                   question={q}
                   index={q._index}
                   total={template.questions.length}
-                  expandedScale={expandedScale}
-                  onToggleScale={(key) => setExpandedScale(expandedScale === key ? null : key)}
+                  expandedKey={expandedKey}
+                  onToggleExpand={(key) => setExpandedKey(expandedKey === key ? null : key)}
                   onUpdate={updateQuestion}
                   onRemove={removeQuestion}
                   onMove={moveQuestion}
@@ -308,13 +324,13 @@ export default function TemplateEditPage() {
           </div>
           <div className="space-y-2">
             {ungroupedQuestions.map((q) => (
-              <QuestionCard
+              <SurveyQuestionCard
                 key={q.key}
                 question={q}
                 index={q._index}
                 total={template.questions.length}
-                expandedScale={expandedScale}
-                onToggleScale={(key) => setExpandedScale(expandedScale === key ? null : key)}
+                expandedKey={expandedKey}
+                onToggleExpand={(key) => setExpandedKey(expandedKey === key ? null : key)}
                 onUpdate={updateQuestion}
                 onRemove={removeQuestion}
                 onMove={moveQuestion}
@@ -350,7 +366,7 @@ export default function TemplateEditPage() {
               </div>
             </button>
           ))}
-          <div className="border-t border-border pt-3 mt-3">
+          <div className="border-t border-border pt-3 mt-3 space-y-2">
             <button
               onClick={addTextQuestion}
               className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-navy/30 hover:bg-surface/50 transition-all text-left"
@@ -359,6 +375,16 @@ export default function TemplateEditPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium text-text">주관식 문항</p>
                 <p className="text-xs text-text-muted">자유 텍스트 입력</p>
+              </div>
+            </button>
+            <button
+              onClick={addChoiceQuestion}
+              className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-navy/30 hover:bg-surface/50 transition-all text-left"
+            >
+              <Badge variant="info">객관식</Badge>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-text">객관식 문항</p>
+                <p className="text-xs text-text-muted">선택지 중 하나 선택</p>
               </div>
             </button>
           </div>
@@ -385,133 +411,5 @@ export default function TemplateEditPage() {
         </div>
       </Modal>
     </div>
-  )
-}
-
-// 문항 카드 컴포넌트
-function QuestionCard({
-  question: q,
-  index,
-  total,
-  expandedScale,
-  onToggleScale,
-  onUpdate,
-  onRemove,
-  onMove,
-}: {
-  question: SurveyQuestion & { _index: number }
-  index: number
-  total: number
-  expandedScale: string | null
-  onToggleScale: (key: string) => void
-  onUpdate: (index: number, updates: Partial<SurveyQuestion>) => void
-  onRemove: (index: number) => void
-  onMove: (index: number, direction: -1 | 1) => void
-}) {
-  const groupConfig = getGroupConfig(q.group)
-  const isScaleExpanded = expandedScale === q.key
-
-  return (
-    <Card padding="sm">
-      <div className="flex items-start gap-3">
-        {/* 순서 변경 */}
-        <div className="flex flex-col gap-0.5 pt-1">
-          <button onClick={() => onMove(index, -1)} className="text-text-muted hover:text-text p-0.5" disabled={index === 0}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-          </button>
-          <button onClick={() => onMove(index, 1)} className="text-text-muted hover:text-text p-0.5" disabled={index === total - 1}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-          </button>
-        </div>
-
-        {/* 문항 내용 */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={q.label}
-              onChange={(e) => onUpdate(index, { label: e.target.value })}
-              className="flex-1 px-2 py-1 border border-border rounded text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
-              placeholder="문항 내용을 입력하세요"
-            />
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="text"
-              value={q.key}
-              onChange={(e) => onUpdate(index, { key: e.target.value })}
-              className="w-36 px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-navy/20"
-              placeholder="문항 키"
-            />
-            <select
-              value={q.group || ''}
-              onChange={(e) => {
-                const group = e.target.value as QuestionGroup
-                onUpdate(index, {
-                  group,
-                  isKillSignal: group === 'killsignal',
-                  key: group === 'killsignal' && !q.key.startsWith('KS_') ? `KS_${q.key}` : q.key.replace(/^KS_/, ''),
-                })
-              }}
-              className="px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-navy/20"
-            >
-              {QUESTION_GROUPS.map((g) => (
-                <option key={g.key} value={g.key}>{g.label}</option>
-              ))}
-            </select>
-            <select
-              value={q.type}
-              onChange={(e) => onUpdate(index, { type: e.target.value as 'scale' | 'text' })}
-              className="px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-navy/20"
-            >
-              <option value="scale">4점 척도</option>
-              <option value="text">주관식</option>
-            </select>
-            {/* 척도 설명 토글 (4점 척도일 때만) */}
-            {q.type === 'scale' && (
-              <button
-                onClick={() => onToggleScale(q.key)}
-                className={`text-xs px-2 py-0.5 rounded transition-colors ${
-                  isScaleExpanded ? 'bg-navy/10 text-navy' : 'text-text-muted hover:text-navy'
-                }`}
-              >
-                답변 설명 {isScaleExpanded ? '접기' : '편집'}
-              </button>
-            )}
-          </div>
-
-          {/* 4점 척도 답변 설명 */}
-          {q.type === 'scale' && isScaleExpanded && (
-            <div className="mt-2 p-3 bg-surface rounded-lg">
-              <p className="text-xs font-medium text-text-muted mb-2">4점 척도 답변 설명</p>
-              <div className="grid grid-cols-4 gap-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i}>
-                    <label className="text-xs text-text-muted block mb-1">{i + 1}점</label>
-                    <input
-                      type="text"
-                      value={q.scaleLabels?.[i] || DEFAULT_SCALE_LABELS[i]}
-                      onChange={(e) => {
-                        const labels = [...(q.scaleLabels || [...DEFAULT_SCALE_LABELS])]
-                        labels[i] = e.target.value
-                        onUpdate(index, { scaleLabels: labels })
-                      }}
-                      className="w-full px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-navy/20"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 삭제 */}
-        <button onClick={() => onRemove(index)} className="text-text-muted hover:text-nogo p-1">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </div>
-    </Card>
   )
 }

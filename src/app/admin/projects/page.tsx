@@ -11,12 +11,22 @@ import Link from 'next/link'
 import { CATEGORIES, PRODUCT_LINES } from '@/lib/template-constants'
 import type { Project, ProjectStatus, ServicePlan } from '@/lib/types'
 
+interface Client {
+  id: string
+  name: string
+  company?: string
+}
+
+type ProjectWithClient = Project & { client?: Client | null }
+
 export default function ProjectsPage() {
   const supabase = createClient()
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<ProjectWithClient[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({
+    client_id: '',
     product_name: '',
     product_category: '화장품',
     product_line: '',
@@ -25,14 +35,23 @@ export default function ProjectsPage() {
     test_duration: 10,
   })
 
-  useEffect(() => { loadProjects() }, [])
+  useEffect(() => { loadProjects(); loadClients() }, [])
+
+  async function loadClients() {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, name, company')
+      .eq('role', 'client')
+      .order('name')
+    setClients(data || [])
+  }
 
   async function loadProjects() {
     const { data } = await supabase
       .from('projects')
-      .select('*')
+      .select('*, client:profiles!client_id(id, name, company)')
       .order('created_at', { ascending: false })
-    setProjects(data || [])
+    setProjects((data as ProjectWithClient[]) || [])
     setLoading(false)
   }
 
@@ -40,12 +59,22 @@ export default function ProjectsPage() {
     const { product_line, ...rest } = form
     const payload = {
       ...rest,
+      client_id: form.client_id || null,
       product_category: product_line ? `${form.product_category} > ${product_line}` : form.product_category,
       status: 'pending',
     }
     const { error } = await supabase.from('projects').insert(payload)
     if (!error) {
       setShowCreate(false)
+      setForm({
+        client_id: '',
+        product_name: '',
+        product_category: '화장품',
+        product_line: '',
+        plan: 'standard',
+        panel_size: 50,
+        test_duration: 10,
+      })
       loadProjects()
     }
   }
@@ -73,6 +102,7 @@ export default function ProjectsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>제품명</TableHead>
+                <TableHead>고객사</TableHead>
                 <TableHead>플랜</TableHead>
                 <TableHead>패널</TableHead>
                 <TableHead>상태</TableHead>
@@ -84,6 +114,17 @@ export default function ProjectsPage() {
               {projects.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.product_name}</TableCell>
+                  <TableCell>
+                    {p.client ? (
+                      <span className="text-sm">
+                        {p.client.company
+                          ? <><span className="text-text">{p.client.company}</span><span className="text-text-muted ml-1 text-xs">({p.client.name})</span></>
+                          : p.client.name}
+                      </span>
+                    ) : (
+                      <span className="text-text-muted text-xs">미지정</span>
+                    )}
+                  </TableCell>
                   <TableCell>{p.plan?.toUpperCase()}</TableCell>
                   <TableCell>{p.panel_size}명 / {p.test_duration}일</TableCell>
                   <TableCell><StatusBadge status={p.status as ProjectStatus} /></TableCell>
@@ -103,6 +144,24 @@ export default function ProjectsPage() {
       {/* 프로젝트 생성 모달 */}
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="새 프로젝트 생성" size="md">
         <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text mb-1.5">고객 선택</label>
+            <select
+              value={form.client_id}
+              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20"
+            >
+              <option value="">— 고객 미지정 —</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.company ? `${c.company} (${c.name})` : c.name}
+                </option>
+              ))}
+            </select>
+            {clients.length === 0 && (
+              <p className="text-xs text-text-muted mt-1">등록된 고객이 없습니다. 고객이 가입해야 선택 가능합니다.</p>
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-text mb-1.5">제품명</label>
             <input

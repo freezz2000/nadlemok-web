@@ -49,7 +49,7 @@ export default function MatchingPage() {
     const { data } = await supabase
       .from('projects')
       .select('*')
-      .in('status', ['confirmed', 'recruiting'])
+      .in('status', ['approved', 'recruiting'])
       .order('created_at', { ascending: false })
     setProjects(data || [])
   }
