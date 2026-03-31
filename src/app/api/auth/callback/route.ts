@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.user) {
-      // 프로필에 role 업데이트 (Google 가입 시 role이 없을 수 있음)
+      // 프로필에 role 업데이트 (소셜 가입 시 role이 없을 수 있음)
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -42,9 +42,27 @@ export async function GET(req: Request) {
           .upsert({ id: data.user.id, role, name: data.user.user_metadata?.full_name ?? '' })
       }
 
-      // 패널이면 프로필 설정 페이지로
-      if ((profile?.role ?? role) === 'panel') {
+      const effectiveRole = profile?.role ?? role
+
+      // 패널이면 panel_profiles 존재 여부에 따라 분기
+      if (effectiveRole === 'panel') {
+        const { data: panelProfile } = await supabase
+          .from('panel_profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .single()
+
+        if (panelProfile) {
+          // 기존 패널 → 대시보드
+          return NextResponse.redirect(new URL('/panel', url.origin))
+        }
+        // 신규 패널 → 프로필 등록
         return NextResponse.redirect(new URL('/register/panel', url.origin))
+      }
+
+      // 클라이언트면 /client로
+      if (effectiveRole === 'client') {
+        return NextResponse.redirect(new URL(next === '/' ? '/client' : next, url.origin))
       }
 
       return NextResponse.redirect(new URL(next, url.origin))
