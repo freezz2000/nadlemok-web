@@ -144,8 +144,8 @@ const DEMO = {
   recommendedAction: '지성 피부 대상 오일 성분 저감 처방 조정 후 2차 재검증 진행',
 
   killSignals: [
-    { name: 'KS_자극', label: '자극·홍조', ratio: 0.04, ci_lower: 0.009, ci_upper: 0.099, level: 'safe' as const, comment: '허용 범위 내' },
-    { name: 'KS_끈적임', label: '끈적임·번들거림', ratio: 0.18, ci_lower: 0.107, ci_upper: 0.275, level: 'danger' as const, comment: '즉시 처방 수정 필요. 지성 피부 대량 클레임 유발 위험.' },
+    { name: 'KS_자극', label: '자극·홍조', ratio: 0.04, ci_lower: 0.009, ci_upper: 0.099, level: 'safe' as 'safe' | 'warning' | 'danger', comment: '허용 범위 내' },
+    { name: 'KS_끈적임', label: '끈적임·번들거림', ratio: 0.18, ci_lower: 0.107, ci_upper: 0.275, level: 'danger' as 'safe' | 'warning' | 'danger', comment: '즉시 처방 수정 필요. 지성 피부 대량 클레임 유발 위험.' },
   ],
 
   strengths: [
