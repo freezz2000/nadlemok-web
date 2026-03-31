@@ -60,7 +60,8 @@ export async function GET(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  const callbackUrl = `${origin}/api/auth/callback?role=${role}&next=${next}`
+  // 매직링크는 implicit flow(hash token)를 사용하므로 클라이언트 페이지로 처리
+  const callbackUrl = `${origin}/auth/social?role=${role}`
 
   // 3. 매직링크 생성 시도 (사용자가 이미 존재하면 성공)
   const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
