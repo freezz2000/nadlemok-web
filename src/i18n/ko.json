@@ -42,7 +42,7 @@
     "editableLabel": "수정 가능",
     "lockedLabel": "수정 불가 · 매몰비용 발생",
     "gapInsight": "판단이 틀렸을 때 되돌아올 수 있는 시점은 이미 지나있습니다.",
-    "conclusion": "나들목은 \"체험단과 임상시험 사이의 사각지대\"를 채우는 Pre-Launch 특화 검증 서비스입니다."
+    "conclusion": "나들목은 \"내부 테스트와 임상시험/체험단 사이의 사각지대\"를 채우는 Pre-Launch 특화 검증 서비스입니다."
   },
   "solution": {
     "title": "나들목이란 무엇인가",
@@ -78,7 +78,7 @@
       { "title": "단계별 통계 분석", "desc": "Kill Signal → CI → 피어슨 → 코호트 → 페널티 → 종합 판정" },
       { "title": "판정 리포트 발행", "desc": "Go / Conditional Go / No-Go 리포트 3종 패키지 제공" }
     ],
-    "prep": "고객사 준비물: 1차 조색/조향 완료된 벌크 2kg 또는 소분 공병 60개"
+    "prep": "고객사 준비물: 출시완료 전 제형 확정된 벌크 2Kg"
   },
   "verdict": {
     "title": "3단계 출시 판정",
