@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
@@ -73,7 +73,23 @@ export default function PanelProfilePage() {
   const router = useRouter()
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
+
+  // 이미 프로필이 완성된 유저는 패널 대시보드로
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('panel_profiles')
+        .select('skin_type, terms_agreed_at')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          if (data?.skin_type && data?.terms_agreed_at) router.replace('/panel')
+        })
+    })
+  }, [])
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -90,6 +106,18 @@ export default function PanelProfilePage() {
 
   const allRequired = REQUIRED_TERMS.every(({ key }) => terms[key as keyof typeof terms])
   const allChecked = allRequired && terms.marketing
+
+  function validate() {
+    const errors: Record<string, string> = {}
+    if (!name.trim()) errors.name = '이름을 입력해주세요.'
+    if (!phone.trim()) errors.phone = '연락처를 입력해주세요.'
+    if (!address.zipcode || !address.address) errors.address = '주소 검색으로 주소를 입력해주세요.'
+    if (!form.gender) errors.gender = '성별을 선택해주세요.'
+    if (!form.age_group) errors.age_group = '연령대를 선택해주세요.'
+    if (!form.skin_type) errors.skin_type = '피부 타입을 선택해주세요.'
+    if (!allRequired) errors.terms = '필수 약관에 모두 동의해야 합니다.'
+    return errors
+  }
 
   function toggleAll(checked: boolean) {
     setTerms({ activity: checked, nda: checked, data: checked, safety: checked, privacy: checked, marketing: checked })
@@ -131,7 +159,12 @@ export default function PanelProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!allRequired) return
+    const errors = validate()
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      return
+    }
+    setFieldErrors({})
     setLoading(true)
     setSubmitError(null)
 
@@ -188,33 +221,38 @@ export default function PanelProfilePage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* 이름 */}
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">이름</label>
+              <label className="block text-sm font-medium text-text mb-1.5">
+                이름 <span className="text-nogo">*</span>
+              </label>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                onChange={(e) => { setName(e.target.value); setFieldErrors(p => ({ ...p, name: '' })) }}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${fieldErrors.name ? 'border-nogo' : 'border-border'}`}
                 placeholder="이름을 입력하세요"
-                required
               />
+              {fieldErrors.name && <p className="text-xs text-nogo mt-1">{fieldErrors.name}</p>}
             </div>
 
             {/* 연락처 */}
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">연락처</label>
+              <label className="block text-sm font-medium text-text mb-1.5">
+                연락처 <span className="text-nogo">*</span>
+              </label>
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                onChange={(e) => { setPhone(e.target.value); setFieldErrors(p => ({ ...p, phone: '' })) }}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${fieldErrors.phone ? 'border-nogo' : 'border-border'}`}
                 placeholder="010-0000-0000"
               />
+              {fieldErrors.phone && <p className="text-xs text-nogo mt-1">{fieldErrors.phone}</p>}
             </div>
 
             {/* 샘플 수취 주소 */}
             <div>
               <label className="block text-sm font-medium text-text mb-1.5">
-                샘플 수취 주소
+                샘플 수취 주소 <span className="text-nogo">*</span>
                 <span className="text-text-muted font-normal ml-1">(테스트 제품 발송에 사용됩니다)</span>
               </label>
               <div className="flex gap-2 mb-2">
@@ -247,17 +285,20 @@ export default function PanelProfilePage() {
                 className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
                 placeholder="상세주소 입력 (동·호수 등)"
               />
+              {fieldErrors.address && <p className="text-xs text-nogo mt-1">{fieldErrors.address}</p>}
             </div>
 
             {/* 성별 */}
             <div>
-              <label className="block text-sm font-medium text-text mb-2">성별</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                성별 <span className="text-nogo">*</span>
+              </label>
               <div className="flex gap-3">
                 {genders.map((g) => (
                   <button
                     key={g}
                     type="button"
-                    onClick={() => setForm({ ...form, gender: g })}
+                    onClick={() => { setForm({ ...form, gender: g }); setFieldErrors(p => ({ ...p, gender: '' })) }}
                     className={`flex-1 py-2 rounded-lg border text-sm transition-all ${
                       form.gender === g
                         ? 'border-navy bg-navy/5 font-medium'
@@ -268,17 +309,20 @@ export default function PanelProfilePage() {
                   </button>
                 ))}
               </div>
+              {fieldErrors.gender && <p className="text-xs text-nogo mt-1">{fieldErrors.gender}</p>}
             </div>
 
             {/* 연령대 */}
             <div>
-              <label className="block text-sm font-medium text-text mb-2">연령대</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                연령대 <span className="text-nogo">*</span>
+              </label>
               <div className="flex flex-wrap gap-2">
                 {ageGroups.map((a) => (
                   <button
                     key={a}
                     type="button"
-                    onClick={() => setForm({ ...form, age_group: a })}
+                    onClick={() => { setForm({ ...form, age_group: a }); setFieldErrors(p => ({ ...p, age_group: '' })) }}
                     className={`px-4 py-2 rounded-lg border text-sm transition-all ${
                       form.age_group === a
                         ? 'border-navy bg-navy/5 font-medium'
@@ -289,17 +333,20 @@ export default function PanelProfilePage() {
                   </button>
                 ))}
               </div>
+              {fieldErrors.age_group && <p className="text-xs text-nogo mt-1">{fieldErrors.age_group}</p>}
             </div>
 
             {/* 피부 타입 */}
             <div>
-              <label className="block text-sm font-medium text-text mb-2">피부 타입</label>
+              <label className="block text-sm font-medium text-text mb-2">
+                피부 타입 <span className="text-nogo">*</span>
+              </label>
               <div className="flex flex-wrap gap-2">
                 {skinTypes.map((s) => (
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setForm({ ...form, skin_type: s })}
+                    onClick={() => { setForm({ ...form, skin_type: s }); setFieldErrors(p => ({ ...p, skin_type: '' })) }}
                     className={`px-4 py-2 rounded-lg border text-sm transition-all ${
                       form.skin_type === s
                         ? 'border-navy bg-navy/5 font-medium'
@@ -310,6 +357,7 @@ export default function PanelProfilePage() {
                   </button>
                 ))}
               </div>
+              {fieldErrors.skin_type && <p className="text-xs text-nogo mt-1">{fieldErrors.skin_type}</p>}
             </div>
 
             {/* 피부 고민 (다중 선택) */}
@@ -433,8 +481,8 @@ export default function PanelProfilePage() {
                   </div>
                 </div>
 
-                {!allRequired && (
-                  <p className="text-xs text-nogo mt-2">필수 약관에 모두 동의해야 가입이 가능합니다.</p>
+                {fieldErrors.terms && (
+                  <p className="text-xs text-nogo mt-2">{fieldErrors.terms}</p>
                 )}
               </div>
             </div>
@@ -450,7 +498,6 @@ export default function PanelProfilePage() {
               loading={loading}
               className="w-full"
               size="lg"
-              disabled={!allRequired}
             >
               프로필 저장하고 시작하기
             </Button>

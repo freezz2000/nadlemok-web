@@ -98,6 +98,14 @@ export default function ProjectDetailPage() {
   // 패널별 응답 현황 (testing 상태)
   const [panelResponseMap, setPanelResponseMap] = useState<Record<string, number>>({})
 
+  // 패널 교체 (testing 상태)
+  const [testingEditMode, setTestingEditMode] = useState(false)
+  const [testingAvailablePanels, setTestingAvailablePanels] = useState<AvailablePanel[]>([])
+  const [testingDropIds, setTestingDropIds] = useState<Set<string>>(new Set())
+  const [testingAddIds, setTestingAddIds] = useState<Set<string>>(new Set())
+  const [testingFilter, setTestingFilter] = useState({ gender: '', age_group: '', skin_type: '' })
+  const [savingTestingChange, setSavingTestingChange] = useState(false)
+
   // 패널 섹션 토글 (analyzing/completed 상태에서 접힘)
   const [panelSectionOpen, setPanelSectionOpen] = useState(true)
 
@@ -107,6 +115,16 @@ export default function ProjectDetailPage() {
   // 패널 상세 팝업
   const [panelDetail, setPanelDetail] = useState<PanelDetail | null>(null)
   const [loadingPanelDetail, setLoadingPanelDetail] = useState(false)
+
+  // 패널 설문 응답 보기
+  const [panelSurveyView, setPanelSurveyView] = useState<{
+    panelId: string
+    panelName: string
+    responses: Record<string, number> | null
+    open_weakness?: string
+    open_improvement?: string
+  } | null>(null)
+  const [loadingPanelSurvey, setLoadingPanelSurvey] = useState(false)
 
   useEffect(() => { load() }, [id])
 
@@ -165,7 +183,7 @@ export default function ProjectDetailPage() {
       setAvailablePanels((allPanels as unknown as AvailablePanel[]) || [])
     }
 
-    // testing 상태: 패널별 응답 횟수 로드
+    // testing 상태: 패널별 응답 횟수 로드 + 교체 가능 패널 목록
     if (proj?.status === 'testing' && survs?.length) {
       const surveyId = survs[0].id
       const { data: responses } = await supabase
@@ -178,6 +196,14 @@ export default function ProjectDetailPage() {
         countMap[r.panel_id] = (countMap[r.panel_id] ?? 0) + 1
       }
       setPanelResponseMap(countMap)
+
+      // 전체 패널 중 현재 매칭되지 않은 패널만 교체 후보로
+      const { data: allPanels } = await supabase
+        .from('profiles')
+        .select('id, name, panel_profiles(*)')
+        .eq('role', 'panel')
+        .order('name')
+      setTestingAvailablePanels((allPanels as unknown as AvailablePanel[]) || [])
     }
 
     // analyzing/completed 상태: 전체 응답 로드 + 패널 섹션 접기
@@ -221,6 +247,50 @@ export default function ProjectDetailPage() {
 
     setSavingMatching(false)
     load()
+  }
+
+  async function saveTestingChanges() {
+    if (!surveys.length) return
+    setSavingTestingChange(true)
+    const surveyId = surveys[0].id
+
+    if (testingDropIds.size > 0) {
+      await supabase.from('survey_panels')
+        .delete()
+        .eq('survey_id', surveyId)
+        .in('panel_id', Array.from(testingDropIds))
+    }
+    if (testingAddIds.size > 0) {
+      await supabase.from('survey_panels').insert(
+        Array.from(testingAddIds).map((panel_id) => ({ survey_id: surveyId, panel_id }))
+      )
+    }
+
+    setSavingTestingChange(false)
+    setTestingEditMode(false)
+    setTestingDropIds(new Set())
+    setTestingAddIds(new Set())
+    load()
+  }
+
+  async function openPanelSurvey(panelId: string, panelName: string) {
+    if (!surveys.length) return
+    setLoadingPanelSurvey(true)
+    setPanelSurveyView(null)
+    const { data } = await supabase
+      .from('survey_responses')
+      .select('responses, open_weakness, open_improvement')
+      .eq('survey_id', surveys[0].id)
+      .eq('panel_id', panelId)
+      .single()
+    setPanelSurveyView({
+      panelId,
+      panelName,
+      responses: data?.responses ?? null,
+      open_weakness: data?.open_weakness,
+      open_improvement: data?.open_improvement,
+    })
+    setLoadingPanelSurvey(false)
   }
 
   async function openPanelDetail(panelId: string) {
@@ -972,26 +1042,63 @@ export default function ProjectDetailPage() {
 
         return (
           <Card className="mt-6">
-            {/* 헤더 — analyzing/completed 일 때 토글 버튼 */}
-            <button
-              type="button"
-              onClick={() => setPanelSectionOpen(!panelSectionOpen)}
-              className="w-full flex items-center gap-2 text-left mb-4"
-            >
-              <svg
-                className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform ${panelSectionOpen ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            {/* 헤더 */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setPanelSectionOpen(!panelSectionOpen)}
+                className="flex items-center gap-2 flex-1 text-left"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="flex-1 text-base font-semibold text-text">매칭된 패널</span>
-              <span className="text-sm text-text-muted">{matchedPanels.length}명</span>
-              {isAnalyzing && (
-                <span className="text-xs px-2 py-0.5 bg-surface rounded-full text-text-muted border border-border">
-                  {panelSectionOpen ? '접기' : '펼치기'}
-                </span>
+                <svg
+                  className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform ${panelSectionOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                <span className="text-base font-semibold text-text">매칭된 패널</span>
+                <span className="text-sm text-text-muted">{matchedPanels.length}명</span>
+                {isAnalyzing && (
+                  <span className="text-xs px-2 py-0.5 bg-surface rounded-full text-text-muted border border-border">
+                    {panelSectionOpen ? '접기' : '펼치기'}
+                  </span>
+                )}
+              </button>
+              {isTesting && !testingEditMode && (
+                <button
+                  onClick={() => setTestingEditMode(true)}
+                  className="text-xs px-3 py-1.5 border border-border rounded-lg text-text-muted hover:border-navy/30 hover:text-navy transition-all flex-shrink-0"
+                >
+                  패널 교체
+                </button>
               )}
-            </button>
+              {isTesting && testingEditMode && (
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => { setTestingEditMode(false); setTestingDropIds(new Set()); setTestingAddIds(new Set()) }}
+                    className="text-xs px-3 py-1.5 border border-border rounded-lg text-text-muted transition-all"
+                  >
+                    취소
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={saveTestingChanges}
+                    loading={savingTestingChange}
+                    disabled={testingDropIds.size === 0 && testingAddIds.size === 0}
+                  >
+                    저장
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* 패널 교체 모드: 변경 미리보기 */}
+            {isTesting && testingEditMode && (testingDropIds.size > 0 || testingAddIds.size > 0) && (
+              <div className="mb-4 px-3 py-2 bg-surface rounded-lg text-xs flex gap-3">
+                {testingDropIds.size > 0 && <span className="text-nogo font-medium">− {testingDropIds.size}명 제거</span>}
+                {testingAddIds.size > 0 && <span className="text-go font-medium">+ {testingAddIds.size}명 추가</span>}
+                <span className="text-text-muted ml-auto">저장 전까지 반영되지 않습니다</span>
+              </div>
+            )}
 
             {/* 패널 내용 — 토글 */}
             {panelSectionOpen && <>
@@ -1040,6 +1147,7 @@ export default function ProjectDetailPage() {
                   <TableHead>매칭일</TableHead>
                   <TableHead>상태</TableHead>
                   {isTesting && <TableHead className="text-center">설문 진행</TableHead>}
+                  {isTesting && testingEditMode && <TableHead className="text-center">제거</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1050,8 +1158,13 @@ export default function ProjectDetailPage() {
                   const hasResponded = responseCount > 0
                   const isComplete = responseCount >= 1
 
+                  const isDropped = testingDropIds.has(mp.panel_id)
+
                   return (
-                    <TableRow key={mp.id} className={isTesting && !hasResponded ? 'bg-nogo-bg/30' : ''}>
+                    <TableRow key={mp.id} className={
+                      isDropped ? 'opacity-40 line-through bg-nogo-bg/20' :
+                      isTesting && !hasResponded ? 'bg-nogo-bg/30' : ''
+                    }>
                       <TableCell>
                         <button
                           onClick={() => openPanelDetail(mp.panel_id)}
@@ -1087,11 +1200,136 @@ export default function ProjectDetailPage() {
                           )}
                         </TableCell>
                       )}
+                      {isTesting && testingEditMode && (
+                        <TableCell className="text-center">
+                          <button
+                            onClick={() => {
+                              const next = new Set(testingDropIds)
+                              if (next.has(mp.panel_id)) next.delete(mp.panel_id)
+                              else next.add(mp.panel_id)
+                              setTestingDropIds(next)
+                            }}
+                            className={`text-xs px-2 py-1 rounded-lg border transition-all ${
+                              isDropped
+                                ? 'border-nogo bg-nogo text-white'
+                                : 'border-border text-nogo hover:border-nogo hover:bg-nogo-bg'
+                            }`}
+                          >
+                            {isDropped ? '취소' : '제거'}
+                          </button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
+
+            {/* 패널 교체 모드: 추가 가능 패널 목록 */}
+            {isTesting && testingEditMode && (() => {
+              const currentPanelIds = new Set(matchedPanels.map((mp) => mp.panel_id))
+              const candidates = testingAvailablePanels.filter((p) => {
+                if (currentPanelIds.has(p.id)) return false
+                const pp = p.panel_profiles
+                if (!pp?.is_available) return false
+                if (testingFilter.gender && pp.gender !== testingFilter.gender) return false
+                if (testingFilter.age_group && pp.age_group !== testingFilter.age_group) return false
+                if (testingFilter.skin_type && pp.skin_type !== testingFilter.skin_type) return false
+                return true
+              })
+              const adding = candidates.filter((p) => testingAddIds.has(p.id))
+              const notAdding = candidates.filter((p) => !testingAddIds.has(p.id))
+
+              return (
+                <div className="mt-5 pt-5 border-t border-border">
+                  <p className="text-sm font-semibold text-text mb-3">교체 패널 추가</p>
+
+                  {/* 필터 */}
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <select
+                      value={testingFilter.gender}
+                      onChange={(e) => setTestingFilter({ ...testingFilter, gender: e.target.value })}
+                      className="px-3 py-1.5 border border-border rounded-lg text-sm"
+                    >
+                      <option value="">전체 성별</option>
+                      <option>여성</option><option>남성</option>
+                    </select>
+                    <select
+                      value={testingFilter.age_group}
+                      onChange={(e) => setTestingFilter({ ...testingFilter, age_group: e.target.value })}
+                      className="px-3 py-1.5 border border-border rounded-lg text-sm"
+                    >
+                      <option value="">전체 연령</option>
+                      {['10대','20대','30대','40대','50대 이상'].map((a) => <option key={a}>{a}</option>)}
+                    </select>
+                    <select
+                      value={testingFilter.skin_type}
+                      onChange={(e) => setTestingFilter({ ...testingFilter, skin_type: e.target.value })}
+                      className="px-3 py-1.5 border border-border rounded-lg text-sm"
+                    >
+                      <option value="">전체 피부타입</option>
+                      {['건성','복합성','지성','중성','민감성'].map((s) => <option key={s}>{s}</option>)}
+                    </select>
+                    <span className="ml-auto self-center text-xs text-text-muted">{candidates.length}명 검색됨</span>
+                  </div>
+
+                  {/* 추가 예정 패널 */}
+                  {adding.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-medium text-go mb-1.5">추가 예정 ({adding.length}명)</p>
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {adding.map((p) => {
+                          const pp = p.panel_profiles
+                          return (
+                            <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-go/30 bg-go-bg">
+                              <button onClick={() => openPanelDetail(p.id)} className="text-sm font-medium flex-1 text-left text-navy hover:underline">
+                                {p.name}
+                              </button>
+                              <span className="text-xs text-text-muted">{pp?.gender} / {pp?.age_group} / {pp?.skin_type}</span>
+                              <button
+                                onClick={() => { const n = new Set(testingAddIds); n.delete(p.id); setTestingAddIds(n) }}
+                                className="text-xs px-2 py-1 rounded-lg border border-go text-go hover:bg-go hover:text-white transition-all"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 추가 가능 패널 */}
+                  {notAdding.length === 0 ? (
+                    <p className="text-sm text-text-muted py-4 text-center">
+                      {candidates.length === 0 ? '필터 조건에 맞는 추가 가능 패널이 없습니다.' : '모든 후보 패널이 추가 예정입니다.'}
+                    </p>
+                  ) : (
+                    <div className="space-y-1 max-h-56 overflow-y-auto">
+                      {notAdding.map((p) => {
+                        const pp = p.panel_profiles
+                        return (
+                          <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border hover:border-navy/30 hover:bg-surface/50 transition-all">
+                            <button onClick={() => openPanelDetail(p.id)} className="text-sm font-medium flex-1 text-left hover:text-navy hover:underline">
+                              {p.name}
+                            </button>
+                            <span className="text-xs text-text-muted">{pp?.gender} / {pp?.age_group} / {pp?.skin_type}</span>
+                            {pp?.skin_concern && <span className="text-xs text-text-muted">{pp.skin_concern}</span>}
+                            <button
+                              onClick={() => { const n = new Set(testingAddIds); n.add(p.id); setTestingAddIds(n) }}
+                              className="text-xs px-2 py-1 rounded-lg border border-navy text-navy hover:bg-navy hover:text-white transition-all flex-shrink-0"
+                            >
+                              추가
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             </>}
           </Card>
         )
@@ -1383,6 +1621,151 @@ export default function ProjectDetailPage() {
                   {pp?.is_available ? '활동 가능' : '활동 불가'}
                 </span>
               </div>
+
+              {/* 설문 응답 보기 버튼 — testing/analyzing/completed 상태일 때만 */}
+              {(project.status === 'testing' || project.status === 'analyzing' || project.status === 'completed') && surveys.length > 0 && (
+                <>
+                  <hr className="border-border" />
+                  <button
+                    onClick={() => {
+                      setPanelDetail(null)
+                      openPanelSurvey(panelDetail.id, panelDetail.name)
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-navy text-navy text-sm font-medium hover:bg-navy hover:text-white transition-all"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    실시간 설문보기
+                  </button>
+                </>
+              )}
+            </div>
+          )
+        })() : null}
+      </Modal>
+
+      {/* 패널 설문 응답 모달 */}
+      <Modal
+        open={panelSurveyView !== null || loadingPanelSurvey}
+        onClose={() => { setPanelSurveyView(null); setLoadingPanelSurvey(false) }}
+        title={panelSurveyView ? `${panelSurveyView.panelName} — 설문 응답` : '설문 응답 불러오는 중'}
+        size="lg"
+      >
+        {loadingPanelSurvey ? (
+          <p className="text-sm text-text-muted text-center py-8">불러오는 중...</p>
+        ) : panelSurveyView ? (() => {
+          const questions: SurveyQuestion[] = surveys[0]?.questions || []
+          const resp: Record<string, number> = panelSurveyView.responses ?? {}
+          const hasAnyResponse = panelSurveyView.responses !== null
+
+          const scaleQuestions = questions.filter((q) => q.type === 'scale')
+          const textQuestions = questions.filter((q) => q.type === 'text')
+          const scaleLabels = ['', '매우 아니다', '아니다', '그렇다', '매우 그렇다']
+          const answeredCount = scaleQuestions.filter((q) => resp[q.key] != null).length
+
+          return (
+            <div className="space-y-5">
+              {/* 응답 요약 — sticky 고정 */}
+              <div className={`sticky top-[-1rem] z-10 -mx-6 px-6 pt-4 pb-3 bg-white border-b border-border`}>
+              <div className={`flex items-center gap-3 p-3 rounded-lg border ${hasAnyResponse ? 'bg-surface border-border' : 'bg-nogo-bg/20 border-nogo/20'}`}>
+                {!hasAnyResponse && (
+                  <svg className="w-4 h-4 text-nogo flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+                <div className="flex-1">
+                  <p className="text-xs text-text-muted mb-1">{hasAnyResponse ? '응답 완료 문항' : '아직 설문을 제출하지 않았습니다 — 전체 문항을 미응답으로 표시합니다'}</p>
+                  {hasAnyResponse && (
+                    <div className="w-full h-1.5 bg-surface-dark rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-navy rounded-full"
+                        style={{ width: `${scaleQuestions.length > 0 ? (answeredCount / scaleQuestions.length) * 100 : 0}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+                {hasAnyResponse && (
+                  <span className="text-sm font-bold text-navy flex-shrink-0">
+                    {answeredCount} / {scaleQuestions.length}문항
+                  </span>
+                )}
+              </div>
+              </div>{/* /sticky wrapper */}
+
+              {/* 척도 문항 응답 */}
+              {scaleQuestions.length > 0 && (
+                <div className="space-y-3">
+                  {scaleQuestions.map((q) => {
+                    const val = resp[q.key]
+                    const hasResponse = val != null
+                    return (
+                      <div key={q.key} className={`p-3 rounded-lg border ${
+                        q.isKillSignal
+                          ? hasResponse && val >= 3 ? 'border-nogo/40 bg-nogo-bg/30' : 'border-orange-200 bg-orange-50/30'
+                          : 'border-border bg-surface'
+                      }`}>
+                        <div className="flex items-start gap-2 mb-2">
+                          {q.isKillSignal && (
+                            <span className="text-xs px-1.5 py-0.5 bg-nogo-bg text-nogo border border-nogo/20 rounded font-medium flex-shrink-0">KS</span>
+                          )}
+                          <p className="text-sm text-text leading-snug">{q.label}</p>
+                        </div>
+                        {hasResponse ? (
+                          <div className="flex gap-1.5">
+                            {[1, 2, 3, 4].map((n) => (
+                              <div
+                                key={n}
+                                className={`flex-1 py-1.5 rounded text-center text-xs font-medium transition-all ${
+                                  val === n
+                                    ? n >= 3 && q.isKillSignal
+                                      ? 'bg-nogo text-white'
+                                      : 'bg-navy text-white'
+                                    : 'bg-white border border-border text-text-muted'
+                                }`}
+                              >
+                                <span className="block text-[10px] leading-none mb-0.5 opacity-70">{n}</span>
+                                <span className="hidden sm:block text-[10px] leading-tight">{scaleLabels[n]}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-text-muted italic">미응답</p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* 주관식 응답 */}
+              {textQuestions.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">주관식 응답</p>
+                  {panelSurveyView.open_weakness ? (
+                    <div className="p-3 rounded-lg border border-border bg-surface">
+                      <p className="text-xs text-text-muted mb-1">아쉬운 점</p>
+                      <p className="text-sm text-text">{panelSurveyView.open_weakness}</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg border border-border bg-surface">
+                      <p className="text-xs text-text-muted mb-1">아쉬운 점</p>
+                      <p className="text-xs text-text-muted italic">미응답</p>
+                    </div>
+                  )}
+                  {panelSurveyView.open_improvement ? (
+                    <div className="p-3 rounded-lg border border-border bg-surface">
+                      <p className="text-xs text-text-muted mb-1">개선 제안</p>
+                      <p className="text-sm text-text">{panelSurveyView.open_improvement}</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg border border-border bg-surface">
+                      <p className="text-xs text-text-muted mb-1">개선 제안</p>
+                      <p className="text-xs text-text-muted italic">미응답</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })() : null}
