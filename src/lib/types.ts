@@ -51,6 +51,19 @@ export interface PanelProfile {
   address_detail?: string
 }
 
+export interface ClientProfile {
+  id: string
+  company_name?: string
+  contact_name?: string
+  contact_phone?: string
+  position?: string
+  business_number?: string
+  tax_email?: string
+  terms_agreed_at?: string
+  terms_marketing_agreed?: boolean
+  created_at: string
+}
+
 export type QuestionGroup = 'killsignal' | 'usage' | 'function' | 'claim_risk' | 'verification' | 'overall'
 
 export interface SurveyQuestion {
@@ -222,4 +235,15 @@ export interface AnalysisResult {
     insight: string
   }
   analyzed_at: string
+}
+
+export interface Inquiry {
+  id: string
+  company: string
+  name: string
+  phone: string
+  email: string
+  message?: string
+  is_read: boolean
+  created_at: string
 }

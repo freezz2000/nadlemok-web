@@ -16,10 +16,16 @@ export default function RegisterPage() {
   const [company, setCompany] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (password !== confirmPassword) {
+      setError('비밀번호가 일치하지 않습니다.')
+      return
+    }
     setLoading(true)
 
     const { data, error: signUpError } = await supabase.auth.signUp({
@@ -48,7 +54,7 @@ export default function RegisterPage() {
       if (role === 'panel') {
         window.location.href = '/register/panel'
       } else if (role === 'client') {
-        window.location.href = '/client'
+        window.location.href = '/register/client'
       } else {
         window.location.href = '/admin'
       }
@@ -159,7 +165,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="relative mb-6">
+          <div className="relative mb-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border"></div>
             </div>
@@ -168,52 +174,81 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <form onSubmit={handleRegister} className="space-y-4">
-            {role === 'client' && (
+          {!showEmailForm && (
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(true)}
+              className="w-full py-2.5 border border-border rounded-lg text-sm font-medium text-text hover:border-navy/40 hover:text-navy transition-colors"
+            >
+              이메일로 가입
+            </button>
+          )}
+
+          {showEmailForm && (
+            <form onSubmit={handleRegister} className="space-y-4">
+              {role === 'client' && (
+                <div>
+                  <label className="block text-sm font-medium text-text mb-1.5">회사명</label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                    placeholder="회사명을 입력하세요"
+                    required
+                  />
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">회사명</label>
+                <label className="block text-sm font-medium text-text mb-1.5">이메일</label>
                 <input
-                  type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
-                  placeholder="회사명을 입력하세요"
+                  placeholder="email@example.com"
                   required
                 />
               </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">이메일</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
-                placeholder="email@example.com"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-text mb-1.5">비밀번호</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                  placeholder="6자 이상 입력하세요"
+                  minLength={6}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">비밀번호</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
-                placeholder="6자 이상 입력하세요"
-                minLength={6}
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-text mb-1.5">비밀번호 확인</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${
+                    confirmPassword && confirmPassword !== password ? 'border-nogo' : 'border-border'
+                  }`}
+                  placeholder="비밀번호를 다시 입력하세요"
+                  required
+                />
+                {confirmPassword && confirmPassword !== password && (
+                  <p className="text-xs text-nogo mt-1">비밀번호가 일치하지 않습니다.</p>
+                )}
+              </div>
 
-            {error && <p className="text-sm text-nogo">{error}</p>}
+              {error && <p className="text-sm text-nogo">{error}</p>}
 
-            <Button type="submit" loading={loading} className="w-full" size="lg">
-              가입하기
-            </Button>
-          </form>
+              <Button type="submit" loading={loading} className="w-full" size="lg">
+                가입하기
+              </Button>
+            </form>
+          )}
 
           <div className="mt-6 text-center text-sm text-text-muted">
             이미 계정이 있으신가요?{' '}

@@ -39,7 +39,14 @@ function SocialAuthHandler() {
 
         router.push(panelProfile?.skin_type ? '/panel' : '/register/panel')
       } else if (effectiveRole === 'client') {
-        router.push('/client')
+        const { data: clientProfile } = await supabase
+          .from('client_profiles')
+          .select('terms_agreed_at, contact_phone')
+          .eq('id', userId)
+          .single()
+
+        const isClientComplete = clientProfile?.terms_agreed_at && clientProfile?.contact_phone
+        router.push(isClientComplete ? '/client' : '/register/client')
       } else {
         router.push('/')
       }

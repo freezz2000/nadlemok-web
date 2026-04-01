@@ -70,9 +70,18 @@ export async function GET(req: Request) {
         return NextResponse.redirect(new URL('/register/panel', url.origin))
       }
 
-      // 클라이언트면 /client로
+      // 클라이언트면 프로필 완성 여부에 따라 분기
       if (effectiveRole === 'client') {
-        return NextResponse.redirect(new URL(next === '/' ? '/client' : next, url.origin))
+        const { data: clientProfile } = await supabase
+          .from('client_profiles')
+          .select('terms_agreed_at')
+          .eq('id', data.user.id)
+          .single()
+
+        if (clientProfile?.terms_agreed_at) {
+          return NextResponse.redirect(new URL('/client', url.origin))
+        }
+        return NextResponse.redirect(new URL('/register/client', url.origin))
       }
 
       return NextResponse.redirect(new URL(next, url.origin))
