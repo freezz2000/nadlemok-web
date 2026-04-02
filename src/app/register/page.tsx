@@ -106,6 +106,7 @@ export default function RegisterPage() {
 
             {/* 소셜 가입 */}
             <div className="space-y-2">
+              {/* 네이버 버튼 임시 숨김
               <button
                 type="button"
                 onClick={() => {
@@ -119,6 +120,7 @@ export default function RegisterPage() {
                 </svg>
                 네이버로 가입하기
               </button>
+              */}
 
               <button
                 type="button"

@@ -20,6 +20,7 @@ function LoginContent() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(false)
 
   useEffect(() => {
     const errorCode = searchParams.get('error')
@@ -71,6 +72,7 @@ function LoginContent() {
         <div className="bg-white rounded-xl border border-border shadow-sm p-8">
           {/* 소셜 로그인 */}
           <div className="space-y-2.5 mb-6">
+            {/* 네이버 버튼 임시 숨김
             <button
               type="button"
               onClick={() => { window.location.href = '/api/auth/naver' }}
@@ -82,6 +84,7 @@ function LoginContent() {
               </svg>
               네이버로 로그인
             </button>
+            */}
 
             <button
               type="button"
@@ -120,47 +123,61 @@ function LoginContent() {
             </button>
           </div>
 
-          <div className="relative mb-6">
+          <div className="relative mb-4">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border"></div>
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-text-muted">또는 이메일로 로그인</span>
+              <span className="px-2 bg-white text-text-muted">또는</span>
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">이메일</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
-                placeholder="email@example.com"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">비밀번호</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
-                placeholder="비밀번호를 입력하세요"
-                required
-              />
-            </div>
+          {!showEmailForm ? (
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-text hover:bg-surface transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              이메일로 로그인
+            </button>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-text mb-1.5">이메일</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                  placeholder="email@example.com"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text mb-1.5">비밀번호</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy"
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                />
+              </div>
 
-            {error && (
-              <p className="text-sm text-nogo">{error}</p>
-            )}
+              {error && (
+                <p className="text-sm text-nogo">{error}</p>
+              )}
 
-            <Button type="submit" loading={loading} className="w-full" size="lg">
-              로그인
-            </Button>
-          </form>
+              <Button type="submit" loading={loading} className="w-full" size="lg">
+                로그인
+              </Button>
+            </form>
+          )}
 
           <div className="mt-6 text-center text-sm text-text-muted">
             계정이 없으신가요?{' '}

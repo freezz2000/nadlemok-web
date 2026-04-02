@@ -15,6 +15,7 @@ function InquiryModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,6 +142,22 @@ function InquiryModal({ onClose }: { onClose: () => void }) {
               />
             </div>
 
+            <div className="flex items-start gap-2.5 p-3 bg-gray-50 rounded-lg">
+              <input
+                type="checkbox"
+                id="privacy"
+                checked={privacyAgreed}
+                onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-gray-300 text-navy cursor-pointer flex-shrink-0"
+              />
+              <label htmlFor="privacy" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+                <span className="font-medium text-gray-800">[필수]</span> 개인정보 수집·이용에 동의합니다.{" "}
+                <span className="text-gray-400">
+                  (수집 항목: 회사명, 담당자명, 연락처, 이메일, 문의내용 / 이용 목적: 문의 처리 및 답변 / 보유 기간: 문의 처리 완료 후 1년)
+                </span>
+              </label>
+            </div>
+
             {error && <p className="text-sm text-red-500">{error}</p>}
 
             <div className="flex gap-3 pt-1">
@@ -153,8 +170,8 @@ function InquiryModal({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-bold hover:bg-navy/90 transition-colors disabled:opacity-60"
+                disabled={loading || !privacyAgreed}
+                className="flex-1 py-2.5 bg-navy text-white rounded-lg text-sm font-bold hover:bg-navy/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? "전송 중..." : "문의 보내기"}
               </button>
