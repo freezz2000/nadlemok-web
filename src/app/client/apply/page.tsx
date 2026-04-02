@@ -108,7 +108,8 @@ export default function ServiceApplyPage() {
       const toss = await loadTossPayments(clientKey)
       const payment = toss.payment({ customerKey: user.id })
 
-      await payment.requestPayment({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (payment as any).requestPayment({
         method: paymentMethod,
         amount: { currency: 'KRW', value: amount },
         orderId,
