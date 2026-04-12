@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
       try {
         const { Resend } = await import('resend')
         const resend = new Resend(process.env.RESEND_API_KEY)
-        await resend.emails.send({
-          from: '나들목 <noreply@linebreakers.co.kr>',
+        const { error: emailError } = await resend.emails.send({
+          from: '나들목 <onboarding@resend.dev>',
           to: trimmed,
           subject: `[나들목] 제품 테스트 패널 초대 — ${project.product_name}`,
           html: `
@@ -109,9 +109,15 @@ export async function POST(req: NextRequest) {
             </div>
           `,
         })
-        results.push({ email: trimmed, status: 'sent' })
-      } catch {
-        results.push({ email: trimmed, status: 'email_failed' })
+        if (emailError) {
+          console.error('resend error:', emailError)
+          results.push({ email: trimmed, status: 'email_failed', message: emailError.message })
+        } else {
+          results.push({ email: trimmed, status: 'sent' })
+        }
+      } catch (emailErr) {
+        console.error('resend exception:', emailErr)
+        results.push({ email: trimmed, status: 'email_failed', message: String(emailErr) })
       }
     }
 
