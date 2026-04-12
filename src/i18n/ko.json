@@ -13,7 +13,7 @@
     "badge1": "화장품 신제품 출시 전 검증 플랫폼",
     "badge2": "Basic 무료 · 5분 설정",
     "headline": "직원 10명만 있으면,\n신제품 출시 판단이 됩니다",
-    "description": "직원들을 패널로 초대하고, 자동 분석으로 Go / No-Go 판정을 받으세요.\n결제 없이 무료로 시작, 상세 분석이 필요할 때만 크레딧을 사용하세요.",
+    "description": "직원들을 패널로 초대하고, 자동 분석으로 Go / No-Go 판정을 받으세요.\n결제 없이 무료로 시작, 전체 분석 결과를 바로 확인하세요.",
     "cta": "무료로 시작하기",
     "ctaSub": "무료 가입 · Basic 영구 무료"
   },
@@ -76,7 +76,7 @@
       { "title": "직원·지인에게 카카오 알림톡 발송 (1분)", "desc": "전화번호를 입력하면 카카오 알림톡으로 초대 링크가 자동 발송됩니다." },
       { "title": "직원들이 링크 클릭 후 응답 (7~14일)", "desc": "초대받은 패널이 제품을 사용하고 설문에 응답합니다." },
       { "title": "자동 분석 → 신호등 판정", "desc": "응답이 쌓이면 자동으로 Go / Conditional Go / No-Go 판정이 나옵니다." },
-      { "title": "무료 결과 확인, 상세 분석 선택", "desc": "Basic은 무료. 항목별 분석·코호트·드라이버 분석은 크레딧으로 열람." }
+      { "title": "전체 분석 결과 확인", "desc": "Go / Conditional Go / No-Go 판정과 함께 항목별 CI, 코호트, 드라이버 분석까지 모두 확인할 수 있습니다." }
     ],
     "prep": "준비물: 테스트할 제품과 직원 전화번호"
   },
@@ -168,7 +168,7 @@
     "title": "양산 버튼을 누르기 전에, 이 계산을 해보셨습니까?",
     "subtitle": "신제품 1건의 양산 비용 시나리오",
     "production": "평균 원가 3,000원 × 초도 10,000개 = 양산비만 3,000만원",
-    "nadlemok": "Basic 무료로 시작 · 상세 분석은 월 29,000원~",
+    "nadlemok": "Basic 무료 · 외부 패널 이용 시 13,300원/인~",
     "scenarios": [
       { "verdict": "No-Go", "desc": "양산 전 중단 → 매몰비용 전액 방어", "savings": "3,000만원+ 방어" },
       { "verdict": "Conditional Go", "desc": "제형 개선 가이드 → 보완 후 성공 출시", "savings": "리스크 최소화" },
@@ -176,40 +176,40 @@
     ]
   },
   "pricing": {
-    "title": "투명한 크레딧 요금제",
+    "title": "투명한 요금제",
     "plans": [
       {
         "name": "Basic",
         "price": "무료",
         "unit": "영구",
         "panel": "내부 패널 무제한",
-        "analysis": "신호등 판정",
-        "output": "만족도 평균 + Kill Signal 유무",
+        "analysis": "전체 분석 무료",
+        "output": "신호등 · CI · 코호트 · 드라이버",
         "target": "모든 브랜드",
         "recommended": false
       },
       {
-        "name": "Starter",
-        "price": "29,000원",
-        "unit": "/ 월",
-        "panel": "100크레딧/월",
-        "analysis": "Standard 10회",
-        "output": "항목별 CI · 코호트 · KS 상세",
-        "target": "초기 검증 단계",
-        "recommended": false
+        "name": "외부 패널",
+        "price": "13,300원",
+        "unit": "/ 인",
+        "panel": "나들목 외부 패널 DB",
+        "analysis": "전체 분석 무료",
+        "output": "신호등 · CI · 코호트 · 드라이버",
+        "target": "소비자 반응 검증",
+        "recommended": true
       },
       {
-        "name": "Growth",
-        "price": "49,000원",
-        "unit": "/ 월",
-        "panel": "300크레딧/월",
-        "analysis": "Premium 10회",
-        "output": "드라이버 · R&D · 마케팅 가이드",
-        "target": "정기 검증·출시 브랜드",
-        "recommended": true
+        "name": "배송 소분",
+        "price": "1,000원",
+        "unit": "/ 인 추가",
+        "panel": "샘플 소분 · 패널 배송",
+        "analysis": "전체 분석 무료",
+        "output": "신호등 · CI · 코호트 · 드라이버",
+        "target": "샘플 발송 대행 원하는 브랜드",
+        "recommended": false
       }
     ],
-    "pilot": "Standard 열람 = 10크레딧 · Premium 열람 = 30크레딧 · 미사용 크레딧은 매월 리셋됩니다."
+    "pilot": "외부 패널 이용 시 운영대행료 50,000원/건 별도 · Basic(내부 패널)은 완전 무료"
   },
   "whyUs": {
     "title": "왜 나들목인가?",
