@@ -184,9 +184,6 @@ function Callout({ icon, children, variant = 'info' }: {
   )
 }
 
-const PLAN_COST = { standard: 10, premium: 30 } as const
-type AnalysisPlan = keyof typeof PLAN_COST
-
 // ── 메인 페이지 ──────────────────────────────────────────────
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>()
@@ -196,10 +193,6 @@ export default function ResultsPage() {
   const [panelSize, setPanelSize] = useState(0)
   const [satThreshold, setSatThreshold] = useState(3.0)
   const [userId, setUserId] = useState<string | null>(null)
-  const [accessPlan, setAccessPlan] = useState<AnalysisPlan | null>(null) // null = basic only
-  const [creditBalance, setCreditBalance] = useState(0)
-  const [unlocking, setUnlocking] = useState(false)
-  const [unlockError, setUnlockError] = useState('')
 
   useEffect(() => { load() }, [id])
 
@@ -216,51 +209,6 @@ export default function ResultsPage() {
     setPanelSize(project?.panel_size || 50)
     setSatThreshold(project?.satisfaction_threshold ?? 3.0)
 
-    if (user) {
-      // 열람 권한 확인
-      const { data: access } = await supabase
-        .from('analysis_access')
-        .select('plan')
-        .eq('project_id', id)
-        .eq('client_id', user.id)
-        .single()
-      if (access) setAccessPlan(access.plan as AnalysisPlan)
-
-      // 크레딧 잔액
-      const { data: credits } = await supabase
-        .from('client_credits')
-        .select('balance')
-        .eq('client_id', user.id)
-        .single()
-      setCreditBalance(credits?.balance ?? 0)
-    }
-  }
-
-  async function handleUnlock(plan: AnalysisPlan) {
-    if (!userId) return
-    setUnlocking(true)
-    setUnlockError('')
-
-    const res = await fetch('/api/credits/consume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId: userId, projectId: id, plan }),
-    })
-    const data = await res.json()
-
-    if (!res.ok) {
-      if (res.status === 402) {
-        setUnlockError(`크레딧이 부족합니다. 잔액: ${data.balance}cr / 필요: ${data.required}cr`)
-      } else {
-        setUnlockError(data.error || '오류가 발생했습니다')
-      }
-      setUnlocking(false)
-      return
-    }
-
-    setAccessPlan(plan)
-    setCreditBalance(data.remaining)
-    setUnlocking(false)
   }
 
   if (!result) {
@@ -391,66 +339,11 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      {/* ════════════════════════════════════════════════
-          유료 게이트 — Standard/Premium 열람권
-      ════════════════════════════════════════════════ */}
-      {!accessPlan && (
-        <div className="bg-white rounded-2xl border-2 border-navy/20 shadow-sm p-6 mb-6">
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-navy/10 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-text">상세 분석 결과 열람</h3>
-            <p className="text-sm text-text-muted mt-1">항목별 CI · Kill Signal 상세 · 코호트 분석 · 드라이버 분석 등</p>
-            <p className="text-xs text-text-muted mt-1">잔여 크레딧: <span className="font-semibold text-navy">{creditBalance}cr</span></p>
-          </div>
-
-          {unlockError && (
-            <div className="mb-4 px-3 py-2 bg-red-50 text-red-600 text-sm rounded-lg text-center">
-              {unlockError}
-              <Link href="/client/subscription" className="block text-navy underline mt-1 text-xs">
-                크레딧 구독하기
-              </Link>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => handleUnlock('standard')}
-              disabled={unlocking}
-              className="p-4 rounded-xl border-2 border-navy/20 hover:border-navy/40 text-left transition-all disabled:opacity-50"
-            >
-              <p className="font-bold text-text">Standard</p>
-              <p className="text-2xl font-black text-navy mt-1">10cr</p>
-              <p className="text-xs text-text-muted mt-2">항목별 CI · KS 상세 · 코호트</p>
-            </button>
-            <button
-              onClick={() => handleUnlock('premium')}
-              disabled={unlocking}
-              className="p-4 rounded-xl border-2 border-gold/40 hover:border-gold text-left transition-all relative disabled:opacity-50"
-            >
-              <span className="absolute top-3 right-3 text-xs px-2 py-0.5 bg-gold text-white rounded-full">추천</span>
-              <p className="font-bold text-text">Premium</p>
-              <p className="text-2xl font-black text-navy mt-1">30cr</p>
-              <p className="text-xs text-text-muted mt-2">드라이버 · R&D 가이드 · 마케팅</p>
-            </button>
-          </div>
-
-          {creditBalance < 10 && (
-            <p className="text-center mt-4 text-xs text-text-muted">
-              크레딧이 부족하신가요?{' '}
-              <Link href="/client/subscription" className="text-navy underline">구독 플랜 보기</Link>
-            </p>
-          )}
-        </div>
-      )}
 
       {/* ════════════════════════════════════════════════
           섹션 2 : Kill Signal 검증
       ════════════════════════════════════════════════ */}
-      {accessPlan && hasKS && (
+      {hasKS && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="1단계 · Kill Signal 검증"
@@ -512,7 +405,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 3 : 핵심 강점 CI 검증
       ════════════════════════════════════════════════ */}
-      {accessPlan && strengths.length > 0 && (
+      {strengths.length > 0 && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="2단계 · CI 검증"
@@ -552,7 +445,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 4 : 구조적 약점 CI 검증
       ════════════════════════════════════════════════ */}
-      {accessPlan && weaknesses.length > 0 && (
+      {weaknesses.length > 0 && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="2단계 · CI 검증 (계속)"
@@ -592,7 +485,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 5 : 핵심 기여 요인 (Key Drivers)
       ════════════════════════════════════════════════ */}
-      {accessPlan === 'premium' && hasDrivers && (
+      {hasDrivers && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="3단계 · 피어슨 상관관계 분석"
@@ -632,7 +525,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 6 : 코호트 분석
       ════════════════════════════════════════════════ */}
-      {accessPlan && hasCohort && (
+      {hasCohort && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="4단계 · 코호트별 심층 분석"
@@ -714,7 +607,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 7 : R&D 처방 수정 지침
       ════════════════════════════════════════════════ */}
-      {accessPlan === 'premium' && hasRdGuide && (
+      {hasRdGuide && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="6단계 · 페널티 분석"
@@ -759,7 +652,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 8 : 마케팅 & 세일즈 커뮤니케이션 가이드
       ════════════════════════════════════════════════ */}
-      {accessPlan === 'premium' && hasMarketing && (
+      {hasMarketing && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="마케팅 가이드"
@@ -796,7 +689,7 @@ export default function ResultsPage() {
       {/* ════════════════════════════════════════════════
           섹션 9 : Next Steps 로드맵
       ════════════════════════════════════════════════ */}
-      {accessPlan === 'premium' && hasNextSteps && (
+      {hasNextSteps && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="9단계 · 종합 판정"

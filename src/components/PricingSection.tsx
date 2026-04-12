@@ -53,7 +53,7 @@ export default function PricingSection() {
               </div>
 
               <Link
-                href={plan.name === "Basic" ? "/register" : "/client/subscription"}
+                href="/register"
                 className={`block text-center mt-6 py-3 rounded-lg text-sm font-medium transition-colors ${
                   plan.recommended
                     ? "bg-gold text-navy hover:bg-gold-light"
