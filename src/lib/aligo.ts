@@ -88,7 +88,10 @@ async function sendOne(
  * │                                                 │
  * │ #{제품명} 테스트 패널로 초대드립니다.           │
  * │                                                 │
- * │ 아래 버튼을 클릭하여 참여해 주세요.             │
+ * │ 아래 버튼을 클릭하거나 링크를 복사해            │
+ * │ 참여해 주세요.                                  │
+ * │ #{초대링크}                                     │
+ * │                                                 │
  * │ 초대 링크는 14일 후 만료됩니다.                 │
  * └─────────────────────────────────────────────────┘
  * 버튼: [패널 참여하기] → 웹링크
@@ -98,7 +101,8 @@ export async function sendInvite(phone: string, productName: string, inviteUrl: 
   const message =
     `[나들목] 제품 테스트 패널 초대\n\n` +
     `${productName} 테스트 패널로 초대드립니다.\n\n` +
-    `아래 버튼을 클릭하여 참여해 주세요.\n` +
+    `아래 버튼을 클릭하거나 링크를 복사해 참여해 주세요.\n` +
+    `${inviteUrl}\n\n` +
     `초대 링크는 14일 후 만료됩니다.`
   return sendOne(phone, tplCode, message, makeButton('패널 참여하기', inviteUrl))
 }
@@ -112,6 +116,7 @@ export async function sendInvite(phone: string, productName: string, inviteUrl: 
  * │                                                 │
  * │ #{제품명} 설문 마감이 #{마감일}까지입니다.      │
  * │ 아직 응답하지 않으셨다면 지금 참여해 주세요!   │
+ * │ #{설문링크}                                     │
  * └─────────────────────────────────────────────────┘
  * 버튼: [설문 참여하기] → 웹링크
  */
@@ -120,7 +125,8 @@ export async function sendReminder(phone: string, productName: string, deadline:
   const message =
     `[나들목] 설문 응답을 기다리고 있어요\n\n` +
     `${productName} 설문 마감이 ${deadline}까지입니다.\n` +
-    `아직 응답하지 않으셨다면 지금 참여해 주세요!`
+    `아직 응답하지 않으셨다면 지금 참여해 주세요!\n` +
+    `${surveyUrl}`
   return sendOne(phone, tplCode, message, makeButton('설문 참여하기', surveyUrl))
 }
 
@@ -133,6 +139,7 @@ export async function sendReminder(phone: string, productName: string, deadline:
  * │                                                 │
  * │ #{제품명} 테스트 분석이 완료되었습니다.         │
  * │ 신호등 판정 및 상세 결과를 확인해 보세요.       │
+ * │ #{결과링크}                                     │
  * └─────────────────────────────────────────────────┘
  * 버튼: [결과 확인하기] → 웹링크
  */
@@ -141,6 +148,7 @@ export async function sendResultReady(phone: string, productName: string, result
   const message =
     `[나들목] 분석 결과가 준비되었습니다\n\n` +
     `${productName} 테스트 분석이 완료되었습니다.\n` +
-    `신호등 판정 및 상세 결과를 확인해 보세요.`
+    `신호등 판정 및 상세 결과를 확인해 보세요.\n` +
+    `${resultUrl}`
   return sendOne(phone, tplCode, message, makeButton('결과 확인하기', resultUrl))
 }
