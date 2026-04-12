@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useTranslation } from "@/i18n/useTranslation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -195,21 +196,24 @@ export default function CtaSection() {
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">{t.cta.title}</h2>
           <p className="text-white/70 leading-relaxed mb-8 whitespace-pre-line">{t.cta.description}</p>
 
-          <button
-            onClick={() => setShowModal(true)}
+          <Link
+            href="/register"
             className="inline-block px-10 py-4 bg-gold text-navy font-bold rounded-lg hover:bg-gold-light transition-colors text-lg mb-4"
           >
             {t.cta.button}
-          </button>
+          </Link>
           <div className="text-sm text-white/50 mb-10">{t.cta.offer}</div>
 
           <div className="flex flex-col sm:flex-row justify-center gap-6 text-sm text-white/60">
+            <button
+              onClick={() => setShowModal(true)}
+              className="hover:text-gold transition-colors"
+            >
+              문의하기
+            </button>
+            <span className="hidden sm:inline text-white/20">|</span>
             <a href={`mailto:${t.cta.email}`} className="hover:text-gold transition-colors">
               {t.cta.email}
-            </a>
-            <span className="hidden sm:inline text-white/20">|</span>
-            <a href={`tel:${t.cta.phone}`} className="hover:text-gold transition-colors">
-              {t.cta.phone}
             </a>
           </div>
 

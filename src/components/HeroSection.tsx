@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslation } from "@/i18n/useTranslation";
 
 export default function HeroSection() {
@@ -32,12 +33,12 @@ export default function HeroSection() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-start gap-4">
-            <a
-              href="#cta"
+            <Link
+              href="/register"
               className="px-8 py-4 bg-gold text-navy font-semibold rounded-lg hover:bg-gold-light transition-colors text-base"
             >
               {t.hero.cta}
-            </a>
+            </Link>
             <span className="text-sm text-white/50 self-center">{t.hero.ctaSub}</span>
           </div>
         </div>

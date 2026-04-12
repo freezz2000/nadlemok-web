@@ -34,7 +34,6 @@ export default function ClientProjectDetailPage() {
 
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [approving, setApproving] = useState(false)
   const [showSurveyQuestions, setShowSurveyQuestions] = useState(true)
 
   useEffect(() => { load() }, [id])
@@ -173,23 +172,6 @@ export default function ClientProjectDetailPage() {
     setSaving(false)
   }
 
-  async function approveProject() {
-    if (!project) return
-    setApproving(true)
-    const { error } = await supabase
-      .from('projects')
-      .update({ status: 'approved' })
-      .eq('id', id)
-      .eq('status', 'confirmed') // 확정 상태일 때만 승인 가능
-    if (error) {
-      alert(`승인 처리 중 오류가 발생했습니다: ${error.message}`)
-      setApproving(false)
-      return
-    }
-    setApproving(false)
-    window.location.reload()
-  }
-
   async function confirmSurvey() {
     if (!project || questions.length === 0) return
     setConfirming(true)
@@ -211,7 +193,8 @@ export default function ClientProjectDetailPage() {
       })
     }
 
-    await supabase.from('projects').update({ status: 'confirmed', target_cohort: cohort }).eq('id', id)
+    // 관리자 확정 단계 우회 → 바로 testing 상태로 전환
+    await supabase.from('projects').update({ status: 'testing', target_cohort: cohort }).eq('id', id)
     setConfirming(false)
     window.location.reload()
   }
@@ -219,21 +202,22 @@ export default function ClientProjectDetailPage() {
   if (!project) return <p className="text-text-muted p-6">로딩중...</p>
 
   const isDraft = project.status === 'draft'
-  const isConfirmed = project.status === 'confirmed'
   const isRejected = project.status === 'rejected'
+  const isTesting = project.status === 'testing'
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const stages = [
-    { key: 'pending', label: '신청', desc: '서비스 신청이 접수되어 승인 대기 중입니다' },
-    { key: 'draft', label: '설문 설정', desc: '코호트를 선택하고 설문을 설정해주세요' },
-    { key: 'confirmed', label: '관리자 확정', desc: '관리자가 설문을 확정했습니다. 내용을 검토하고 승인해주세요' },
-    { key: 'approved', label: '승인 완료', desc: '설문이 승인되어 패널 모집 대기 중입니다' },
-    { key: 'recruiting', label: '패널 모집', desc: '타겟에 맞는 패널을 선별 중입니다' },
-    { key: 'testing', label: '테스트', desc: '패널이 제품을 사용하고 평가 중입니다' },
-    { key: 'analyzing', label: '분석', desc: '수집된 데이터를 분석 중입니다' },
+    { key: 'draft', label: '설문 설정', desc: '코호트를 선택하고 설문 문항을 설정해주세요' },
+    { key: 'testing', label: '테스트 진행', desc: '패널을 초대하고 테스트를 진행하세요' },
+    { key: 'analyzing', label: '분석 중', desc: '수집된 데이터를 분석 중입니다' },
     { key: 'completed', label: '완료', desc: '분석이 완료되어 리포트를 확인할 수 있습니다' },
   ]
-  const currentIdx = stages.findIndex((s) => s.key === project.status)
+  // legacy statuses (pending, confirmed, approved, recruiting) → draft로 표시
+  const statusToStage: Record<string, string> = {
+    pending: 'draft', confirmed: 'draft', approved: 'draft', recruiting: 'testing',
+  }
+  const effectiveStatus = statusToStage[project.status] || project.status
+  const currentIdx = stages.findIndex((s) => s.key === effectiveStatus)
 
   const groupBadgeVariant = (color: string) => {
     const map: Record<string, 'nogo' | 'info' | 'go' | 'warning' | 'default'> = {
@@ -283,6 +267,19 @@ export default function ClientProjectDetailPage() {
         )}
         {!isRejected && (
           <p className="text-sm text-text-muted mt-4 text-center">{stages[currentIdx]?.desc}</p>
+        )}
+        {isTesting && (
+          <div className="mt-4 flex justify-center">
+            <Link
+              href={`/client/projects/${id}/invite`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              패널 초대하기
+            </Link>
+          </div>
         )}
       </Card>
 
@@ -448,7 +445,7 @@ export default function ClientProjectDetailPage() {
                 임시 저장
               </Button>
               <Button onClick={confirmSurvey} loading={confirming} disabled={questions.length === 0}>
-                설문 확정
+                테스트 시작하기
               </Button>
               {questions.length === 0 && (
                 <span className="text-xs text-text-muted">문항이 있어야 확정할 수 있습니다</span>
@@ -458,99 +455,8 @@ export default function ClientProjectDetailPage() {
         </>
       )}
 
-      {/* === confirmed 상태: 고객 승인 요청 === */}
-      {isConfirmed && (
-        <Card className="mb-6 border-blue-200 bg-blue-50/40">
-          <div className="flex items-start gap-3 mb-4">
-            <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <CardTitle>설문 승인 요청</CardTitle>
-              <p className="text-sm text-text-muted mt-1">
-                관리자가 설문을 확정했습니다. 아래 문항을 검토한 후 승인해주세요.
-                승인하시면 패널 모집이 시작됩니다.
-              </p>
-            </div>
-          </div>
-
-          {/* 설문 문항 토글 */}
-          <div className="border border-blue-200 rounded-xl overflow-hidden mb-4">
-            <button
-              type="button"
-              onClick={() => setShowSurveyQuestions(!showSurveyQuestions)}
-              className="w-full flex items-center gap-3 px-4 py-3 bg-white/70 hover:bg-white transition-colors text-left"
-            >
-              <svg
-                className={`w-4 h-4 text-blue-400 flex-shrink-0 transition-transform ${showSurveyQuestions ? 'rotate-180' : ''}`}
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-              <span className="flex-1 text-sm font-medium text-text">설문 문항 목록</span>
-              <span className="text-xs text-text-muted">{questions.length}문항</span>
-            </button>
-            {showSurveyQuestions && (
-              <div className="border-t border-blue-200 bg-white px-4 py-3">
-                {questions.length === 0 ? (
-                  <p className="text-sm text-text-muted text-center py-4">문항을 불러오는 중입니다...</p>
-                ) : (
-                  <div className="space-y-0">
-                    {questions.map((q, i) => {
-                      const gc = getGroupConfig(q.group)
-                      return (
-                        <div key={q.key} className="flex items-start gap-3 py-2.5 border-b border-border/50 last:border-0">
-                          <span className="text-xs text-text-muted w-6 flex-shrink-0 pt-0.5">{i + 1}.</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-text leading-snug">{q.label || '(내용 없음)'}</p>
-                            {q.type === 'scale' && q.scaleLabels && (
-                              <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                                {q.scaleLabels.map((lbl, li) => (
-                                  <span key={li} className="text-xs text-text-muted bg-surface-dark px-1.5 py-0.5 rounded">
-                                    {li + 1}. {lbl}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {q.type === 'choice' && q.choices && (
-                              <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                                {q.choices.map((ch, ci) => (
-                                  <span key={ci} className="text-xs text-text-muted bg-surface-dark px-1.5 py-0.5 rounded">
-                                    {ch}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0 pt-0.5">
-                            {q.isKillSignal && (
-                              <span className="text-xs px-1.5 py-0.5 bg-nogo-bg text-nogo rounded font-medium">KS</span>
-                            )}
-                            <Badge variant={groupBadgeVariant(gc.color)}>{gc.label}</Badge>
-                            <span className="text-xs text-text-muted">
-                              {q.type === 'scale' ? '4점' : q.type === 'choice' ? '객관식' : '주관식'}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-text-muted">총 {questions.length}개 문항</p>
-            <Button onClick={approveProject} loading={approving}>
-              설문 승인하기
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* === approved 이후: 읽기 전용 === */}
-      {!isDraft && !isConfirmed && !isRejected && project.status !== 'pending' && questions.length > 0 && (
+      {/* === testing 이후: 읽기 전용 === */}
+      {!isDraft && !isRejected && questions.length > 0 && (
         <Card className="mb-6">
           {/* 토글 헤더 */}
           <button
