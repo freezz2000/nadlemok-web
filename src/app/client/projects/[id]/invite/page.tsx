@@ -32,6 +32,7 @@ export default function InvitePage() {
   const [emailInput, setEmailInput] = useState('')
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -100,21 +101,28 @@ export default function InvitePage() {
 
     setSending(true)
     setSendResult(null)
+    setSendError(null)
 
-    const res = await fetch('/api/invite/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, emails }),
-    })
-    const data = await res.json()
+    try {
+      const res = await fetch('/api/invite/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, emails }),
+      })
+      const data = await res.json()
 
-    if (res.ok) {
-      const results = data.results as { email: string; status: string }[]
-      const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
-      const failed = results.filter((r) => r.status === 'error' || r.status === 'email_failed').length
-      setSendResult({ success, failed })
-      setEmailInput('')
-      await load()
+      if (!res.ok) {
+        setSendError(data.error || `오류가 발생했습니다. (${res.status})`)
+      } else {
+        const results = data.results as { email: string; status: string }[]
+        const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
+        const failed = results.filter((r) => r.status === 'error' || r.status === 'email_failed').length
+        setSendResult({ success, failed })
+        setEmailInput('')
+        await load()
+      }
+    } catch {
+      setSendError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
     }
 
     setSending(false)
@@ -185,6 +193,11 @@ export default function InvitePage() {
           </Button>
         </form>
 
+        {sendError && (
+          <div className="mt-3 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-700">
+            {sendError}
+          </div>
+        )}
         {sendResult && (
           <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${
             sendResult.failed === 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
