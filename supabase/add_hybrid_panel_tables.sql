@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS panel_conditions (
 );
 ALTER TABLE panel_conditions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "clients can manage own panel conditions"
+DROP POLICY IF EXISTS "clients can manage own panel conditions" ON panel_conditions;
+CREATE POLICY "clients can manage own panel conditions"
   ON panel_conditions FOR ALL
   USING (
     EXISTS (
@@ -36,7 +37,8 @@ CREATE POLICY IF NOT EXISTS "clients can manage own panel conditions"
         AND projects.client_id = auth.uid()
     )
   );
-CREATE POLICY IF NOT EXISTS "service role manages panel conditions"
+DROP POLICY IF EXISTS "service role manages panel conditions" ON panel_conditions;
+CREATE POLICY "service role manages panel conditions"
   ON panel_conditions FOR ALL USING (auth.role() = 'service_role');
 
 -- 3. 프로젝트 패널 선택 테이블
@@ -51,7 +53,8 @@ CREATE TABLE IF NOT EXISTS project_panel_selections (
 );
 ALTER TABLE project_panel_selections ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "clients can manage own panel selections"
+DROP POLICY IF EXISTS "clients can manage own panel selections" ON project_panel_selections;
+CREATE POLICY "clients can manage own panel selections"
   ON project_panel_selections FOR ALL
   USING (
     EXISTS (
@@ -60,7 +63,8 @@ CREATE POLICY IF NOT EXISTS "clients can manage own panel selections"
         AND projects.client_id = auth.uid()
     )
   );
-CREATE POLICY IF NOT EXISTS "service role manages panel selections"
+DROP POLICY IF EXISTS "service role manages panel selections" ON project_panel_selections;
+CREATE POLICY "service role manages panel selections"
   ON project_panel_selections FOR ALL USING (auth.role() = 'service_role');
 
 -- 4. projects status 허용값에 'matching' 추가 (기존 CHECK 제약 수정)
