@@ -2,7 +2,7 @@
 
 export type UserRole = 'admin' | 'client' | 'panel'
 
-export type ProjectStatus = 'pending' | 'draft' | 'confirmed' | 'approved' | 'recruiting' | 'testing' | 'analyzing' | 'completed' | 'rejected'
+export type ProjectStatus = 'pending' | 'draft' | 'confirmed' | 'approved' | 'recruiting' | 'matching' | 'testing' | 'analyzing' | 'completed' | 'rejected'
 
 export type SurveyStatus = 'draft' | 'active' | 'closed'
 

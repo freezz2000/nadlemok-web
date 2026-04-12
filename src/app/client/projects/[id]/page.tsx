@@ -172,10 +172,11 @@ export default function ClientProjectDetailPage() {
     setSaving(false)
   }
 
-  async function confirmSurvey() {
+  async function goToPanelSetup() {
     if (!project || questions.length === 0) return
     setConfirming(true)
 
+    // 설문 저장
     if (existingSurveyId) {
       await supabase.from('surveys').update({
         questions,
@@ -192,22 +193,22 @@ export default function ClientProjectDetailPage() {
         status: 'draft',
       })
     }
-
-    // 관리자 확정 단계 우회 → 바로 testing 상태로 전환
-    await supabase.from('projects').update({ status: 'testing', target_cohort: cohort }).eq('id', id)
+    await supabase.from('projects').update({ target_cohort: cohort }).eq('id', id)
     setConfirming(false)
-    window.location.reload()
+    window.location.href = `/client/projects/${id}/panel-setup`
   }
 
   if (!project) return <p className="text-text-muted p-6">로딩중...</p>
 
   const isDraft = project.status === 'draft'
   const isRejected = project.status === 'rejected'
+  const isMatching = project.status === 'matching'
   const isTesting = project.status === 'testing'
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
   const stages = [
     { key: 'draft', label: '설문 설정', desc: '코호트를 선택하고 설문 문항을 설정해주세요' },
+    { key: 'matching', label: '패널 매칭', desc: '외부 패널을 선택하고 매칭을 완료해주세요' },
     { key: 'testing', label: '테스트 진행', desc: '패널을 초대하고 테스트를 진행하세요' },
     { key: 'analyzing', label: '분석 중', desc: '수집된 데이터를 분석 중입니다' },
     { key: 'completed', label: '완료', desc: '분석이 완료되어 리포트를 확인할 수 있습니다' },
@@ -267,6 +268,19 @@ export default function ClientProjectDetailPage() {
         )}
         {!isRejected && (
           <p className="text-sm text-text-muted mt-4 text-center">{stages[currentIdx]?.desc}</p>
+        )}
+        {isMatching && (
+          <div className="mt-4 flex justify-center">
+            <Link
+              href={`/client/projects/${id}/panel-match`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              외부 패널 선택하기
+            </Link>
+          </div>
         )}
         {isTesting && (
           <div className="mt-4 flex justify-center">
@@ -444,8 +458,8 @@ export default function ClientProjectDetailPage() {
               <Button variant="secondary" onClick={saveDraft} loading={saving} disabled={questions.length === 0}>
                 임시 저장
               </Button>
-              <Button onClick={confirmSurvey} loading={confirming} disabled={questions.length === 0}>
-                테스트 시작하기
+              <Button onClick={goToPanelSetup} loading={confirming} disabled={questions.length === 0}>
+                다음 — 패널 설정하기
               </Button>
               {questions.length === 0 && (
                 <span className="text-xs text-text-muted">문항이 있어야 확정할 수 있습니다</span>

@@ -497,6 +497,7 @@ export default function ProjectDetailPage() {
     { from: 'pending', to: 'draft', label: '승인' },
     { from: 'approved', to: 'recruiting', label: '패널 모집 시작' },
     { from: 'recruiting', to: 'testing', label: '테스트 시작' },
+    { from: 'matching', to: 'testing', label: '매칭 완료 → 테스트 시작' },
     { from: 'testing', to: 'analyzing', label: '분석 시작' },
     { from: 'analyzing', to: 'completed', label: '완료 처리' },
   ]
@@ -527,6 +528,21 @@ export default function ProjectDetailPage() {
           </Button>
         )}
       </div>
+
+      {/* 패널 매칭 대기 안내 */}
+      {project.status === 'matching' && (
+        <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-amber-700">외부 패널 매칭 진행 중</p>
+            <p className="text-xs text-amber-600 mt-1">
+              고객이 외부 패널을 선택하고 있습니다. 패널 선택이 완료되면 &quot;매칭 완료 → 테스트 시작&quot; 버튼으로 다음 단계로 이동해주세요.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 고객 승인 대기 안내 */}
       {project.status === 'confirmed' && (

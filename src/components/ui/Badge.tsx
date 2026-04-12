@@ -42,6 +42,7 @@ export function StatusBadge({ status }: { status: ProjectStatus }) {
     confirmed: { variant: 'info', label: '관리자 확정' },
     approved: { variant: 'go', label: '고객 승인완료' },
     recruiting: { variant: 'info', label: '패널 모집중' },
+    matching: { variant: 'warning', label: '패널 매칭중' },
     testing: { variant: 'warning', label: '테스트 진행중' },
     analyzing: { variant: 'info', label: '분석중' },
     completed: { variant: 'go', label: '완료' },
