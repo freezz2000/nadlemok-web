@@ -22,7 +22,8 @@ export default function Topbar({ profile, onMenuClick }: TopbarProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.refresh()
+    router.push(profile.role === 'admin' ? '/admin-login' : '/login')
   }
 
   return (
