@@ -2,13 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { CATEGORIES, PRODUCT_LINES, AVAILABLE_CATEGORIES } from '@/lib/template-constants'
 
 export default function ServiceApplyPage() {
-  const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,36 +36,29 @@ export default function ServiceApplyPage() {
     setLoading(true)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setError('로그인이 필요합니다.'); setLoading(false); return }
-
       const productCategory = form.product_line
         ? `${form.product_category} > ${form.product_line}`
         : form.product_category
 
-      const { data: project, error: insertError } = await supabase
-        .from('projects')
-        .insert({
-          client_id: user.id,
+      const res = await fetch('/api/projects/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           product_name: form.product_name,
           product_category: productCategory,
-          plan: 'basic',
-          panel_size: 10,
-          test_duration: 14,
           notes: form.notes || null,
-          status: 'draft',
-          panel_source: 'internal',
-        })
-        .select('id')
-        .single()
+        }),
+      })
 
-      if (insertError || !project) {
-        setError('프로젝트 생성 중 오류가 발생했습니다.')
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || '프로젝트 생성 중 오류가 발생했습니다.')
         setLoading(false)
         return
       }
 
-      router.push(`/client/projects/${project.id}`)
+      router.push(`/client/projects/${data.projectId}`)
     } catch (err) {
       console.error('apply error:', err)
       setError('오류가 발생했습니다. 다시 시도해주세요.')
