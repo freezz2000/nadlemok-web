@@ -24,7 +24,7 @@ export default function CostSection() {
           </div>
           <div className="bg-white/5 backdrop-blur rounded-xl p-8 border border-gold/30 text-center">
             <div className="text-sm text-gold mb-2">With Nadlemok</div>
-            <div className="text-4xl font-bold text-gold mb-2">300만원</div>
+            <div className="text-4xl font-bold text-gold mb-2">무료~</div>
             <div className="text-sm text-white/60">{t.cost.nadlemok}</div>
           </div>
         </div>

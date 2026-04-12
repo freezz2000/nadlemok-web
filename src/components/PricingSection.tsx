@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslation } from "@/i18n/useTranslation";
 
 export default function PricingSection() {
@@ -39,28 +40,28 @@ export default function PricingSection() {
 
               <div className="space-y-4">
                 {[
-                  { label: "Panel", value: plan.panel },
-                  { label: "Analysis", value: plan.analysis },
-                  { label: "Output", value: plan.output },
-                  { label: "Target", value: plan.target },
+                  { label: "패널", value: plan.panel },
+                  { label: "분석", value: plan.analysis },
+                  { label: "제공 결과", value: plan.output },
+                  { label: "추천 대상", value: plan.target },
                 ].map((row, j) => (
                   <div key={j} className="flex justify-between text-sm">
                     <span className={plan.recommended ? "text-white/60" : "text-text-muted"}>{row.label}</span>
-                    <span className={`font-medium ${plan.recommended ? "text-white" : "text-navy"}`}>{row.value}</span>
+                    <span className={`font-medium text-right ${plan.recommended ? "text-white" : "text-navy"}`}>{row.value}</span>
                   </div>
                 ))}
               </div>
 
-              <a
-                href="#cta"
+              <Link
+                href={plan.name === "Basic" ? "/register" : "/client/subscription"}
                 className={`block text-center mt-6 py-3 rounded-lg text-sm font-medium transition-colors ${
                   plan.recommended
                     ? "bg-gold text-navy hover:bg-gold-light"
                     : "bg-navy/5 text-navy hover:bg-navy/10"
                 }`}
               >
-                {plan.recommended ? "Get Started" : "Learn More"}
-              </a>
+                {plan.name === "Basic" ? "무료로 시작하기" : "구독하기"}
+              </Link>
             </div>
           ))}
         </div>
