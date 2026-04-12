@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
 
-    const { product_name, product_category, notes } = await req.json()
+    const { product_name, product_category } = await req.json()
 
     if (!product_name?.trim()) {
       return NextResponse.json({ error: '제품명을 입력해주세요.' }, { status: 400 })
@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
         plan: 'basic',
         panel_size: 10,
         test_duration: 14,
-        notes: notes || null,
         status: 'draft',
       })
       .select('id')

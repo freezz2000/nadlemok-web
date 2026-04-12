@@ -14,7 +14,6 @@ export default function ServiceApplyPage() {
     product_name: '',
     product_category: '화장품',
     product_line: '',
-    notes: '',
   })
 
   const hasProductLines = (PRODUCT_LINES[form.product_category]?.length ?? 0) > 0
@@ -46,7 +45,6 @@ export default function ServiceApplyPage() {
         body: JSON.stringify({
           product_name: form.product_name,
           product_category: productCategory,
-          notes: form.notes || null,
         }),
       })
 
@@ -155,15 +153,7 @@ export default function ServiceApplyPage() {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">기타 요청사항</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 min-h-[60px] resize-none"
-                placeholder="특이사항 등을 자유롭게 기입해주세요 (선택)"
-              />
-            </div>
+
           </div>
         </Card>
 
