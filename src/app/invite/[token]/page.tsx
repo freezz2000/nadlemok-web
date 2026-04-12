@@ -52,10 +52,6 @@ export default function InviteTokenPage() {
         return
       }
 
-      // 이메일 필드 prefill
-      if (data.invitation.email) {
-        setEmail(data.invitation.email)
-      }
       setStep('info')
     }
 

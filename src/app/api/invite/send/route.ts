@@ -6,15 +6,68 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function sendAlimtalk(phone: string, productName: string, inviteUrl: string): Promise<{ ok: boolean; message?: string }> {
+  const apiKey = process.env.ALIGO_API_KEY
+  const userId = process.env.ALIGO_USER_ID
+  const senderKey = process.env.ALIGO_SENDER_KEY
+  const tplCode = process.env.ALIGO_TEMPLATE_CODE
+  const sender = process.env.ALIGO_SENDER_PHONE
+
+  if (!apiKey || !userId || !senderKey || !tplCode || !sender) {
+    return { ok: false, message: '알리고 환경변수 미설정' }
+  }
+
+  // 템플릿 변수 치환된 메시지 (등록한 템플릿과 동일하게)
+  const message = `[나들목] 제품 테스트 패널 초대\n\n${productName} 테스트 패널로 초대드립니다.\n\n아래 버튼을 클릭하여 참여해 주세요.\n초대 링크는 14일 후 만료됩니다.`
+
+  const button = JSON.stringify({
+    button: [
+      {
+        name: '패널 참여하기',
+        linkType: 'WL',
+        linkTypeName: '웹링크',
+        linkPc: inviteUrl,
+        linkMo: inviteUrl,
+      },
+    ],
+  })
+
+  const params = new URLSearchParams({
+    apikey: apiKey,
+    userid: userId,
+    senderkey: senderKey,
+    tpl_code: tplCode,
+    sender,
+    receiver_1: phone.replace(/-/g, ''),
+    recvname_1: '패널',
+    message_1: message,
+    button_1: button,
+  })
+
+  const res = await fetch('https://kakaoapi.aligo.in/akv10/alimtalk/send/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+  })
+
+  const data = await res.json()
+
+  // 알리고 응답: code 0 = 성공
+  if (data.code === 0) {
+    return { ok: true }
+  }
+  return { ok: false, message: data.message || `알리고 오류 (code: ${data.code})` }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { projectId, emails } = await req.json() as { projectId: string; emails: string[] }
+    const { projectId, phones } = await req.json() as { projectId: string; phones: string[] }
 
-    if (!projectId || !emails?.length) {
+    if (!projectId || !phones?.length) {
       return NextResponse.json({ error: '필수 파라미터 누락' }, { status: 400 })
     }
 
-    // 프로젝트 + 설문 정보 조회
+    // 프로젝트 정보 조회
     const { data: project } = await supabase
       .from('projects')
       .select('id, product_name, client_id')
@@ -31,34 +84,37 @@ export async function POST(req: NextRequest) {
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     const results = []
 
-    for (const email of emails) {
-      const trimmed = email.trim().toLowerCase()
+    for (const phone of phones) {
+      const trimmed = phone.trim().replace(/-/g, '')
       if (!trimmed) continue
 
-      // 이미 초대된 경우 건너뜀
+      // 이미 수락한 경우 건너뜀
       const { data: existing } = await supabase
         .from('project_invitations')
         .select('id, status, token')
         .eq('project_id', projectId)
-        .eq('email', trimmed)
-        .single()
+        .eq('phone', trimmed)
+        .maybeSingle()
 
-      if (existing && existing.status === 'accepted') {
-        results.push({ email: trimmed, status: 'already_accepted' })
+      if (existing?.status === 'accepted') {
+        results.push({ phone: trimmed, status: 'already_accepted' })
         continue
       }
 
       let token: string
 
       if (existing) {
-        // 이미 초대가 있으면 토큰 재사용 (상태 리셋)
+        // 기존 초대 재발송 (상태 리셋)
         await supabase
           .from('project_invitations')
-          .update({ status: 'pending', expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() })
+          .update({
+            status: 'pending',
+            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          })
           .eq('id', existing.id)
         token = existing.token
       } else {
@@ -68,56 +124,26 @@ export async function POST(req: NextRequest) {
           .insert({
             project_id: projectId,
             survey_id: survey?.id ?? null,
-            email: trimmed,
+            phone: trimmed,
           })
           .select('token')
           .single()
 
         if (error || !invite) {
-          results.push({ email: trimmed, status: 'error', message: error?.message })
+          results.push({ phone: trimmed, status: 'error', message: error?.message })
           continue
         }
         token = invite.token
       }
 
-      // 초대 이메일 발송
+      // 알림톡 발송
       const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://linebreakers.co.kr'}/invite/${token}`
+      const { ok, message } = await sendAlimtalk(trimmed, project.product_name, inviteUrl)
 
-      try {
-        const { Resend } = await import('resend')
-        const resend = new Resend(process.env.RESEND_API_KEY)
-        const { error: emailError } = await resend.emails.send({
-          from: '나들목 <onboarding@resend.dev>',
-          to: trimmed,
-          subject: `[나들목] 제품 테스트 패널 초대 — ${project.product_name}`,
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
-              <h2 style="color: #1B2A4A; font-size: 22px; margin-bottom: 8px;">제품 테스트에 초대합니다</h2>
-              <p style="color: #64748B; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
-                <strong style="color: #1E293B;">${project.product_name}</strong> 테스트 패널로 초대되었습니다.<br>
-                아래 버튼을 클릭해 설문에 참여해주세요.
-              </p>
-              <a href="${inviteUrl}"
-                style="display: inline-block; background: #1B2A4A; color: white; padding: 14px 28px;
-                       border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600;">
-                패널 참여하기
-              </a>
-              <p style="color: #94A3B8; font-size: 12px; margin-top: 32px; line-height: 1.6;">
-                이 초대 링크는 14일 후 만료됩니다.<br>
-                본 메일은 발신 전용입니다.
-              </p>
-            </div>
-          `,
-        })
-        if (emailError) {
-          console.error('resend error:', emailError)
-          results.push({ email: trimmed, status: 'email_failed', message: emailError.message })
-        } else {
-          results.push({ email: trimmed, status: 'sent' })
-        }
-      } catch (emailErr) {
-        console.error('resend exception:', emailErr)
-        results.push({ email: trimmed, status: 'email_failed', message: String(emailErr) })
+      if (ok) {
+        results.push({ phone: trimmed, status: 'sent' })
+      } else {
+        results.push({ phone: trimmed, status: 'alimtalk_failed', message })
       }
     }
 

@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 interface Invitation {
   id: string
-  email: string
+  phone: string
   status: string
   invited_at: string
   accepted_at: string | null
@@ -28,8 +28,8 @@ export default function InvitePage() {
 
   const [productName, setProductName] = useState('')
   const [invitations, setInvitations] = useState<Invitation[]>([])
-  const [responseMap, setResponseMap] = useState<Record<string, boolean>>({}) // panelId → responded
-  const [emailInput, setEmailInput] = useState('')
+  const [responseMap, setResponseMap] = useState<Record<string, boolean>>({})
+  const [phoneInput, setPhoneInput] = useState('')
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
@@ -38,7 +38,6 @@ export default function InvitePage() {
   const load = useCallback(async () => {
     setLoading(true)
 
-    // 프로젝트 기본 정보
     const { data: proj } = await supabase
       .from('projects')
       .select('product_name')
@@ -46,21 +45,18 @@ export default function InvitePage() {
       .single()
     if (proj) setProductName(proj.product_name)
 
-    // 초대 목록
     const { data: invs } = await supabase
       .from('project_invitations')
-      .select('id, email, status, invited_at, accepted_at, expires_at, panel_id')
+      .select('id, phone, status, invited_at, accepted_at, expires_at, panel_id')
       .eq('project_id', projectId)
       .order('invited_at', { ascending: false })
     setInvitations(invs || [])
 
-    // 응답 여부 (panel_id별)
     const acceptedPanelIds = (invs || [])
       .filter((inv) => inv.panel_id && inv.status === 'accepted')
       .map((inv) => inv.panel_id as string)
 
     if (acceptedPanelIds.length > 0) {
-      // 설문 조회
       const { data: surveys } = await supabase
         .from('surveys')
         .select('id')
@@ -90,14 +86,14 @@ export default function InvitePage() {
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
-    if (!emailInput.trim()) return
+    if (!phoneInput.trim()) return
 
-    const emails = emailInput
+    const phones = phoneInput
       .split(/[\n,]/)
-      .map((e) => e.trim())
+      .map((p) => p.trim().replace(/-/g, ''))
       .filter(Boolean)
 
-    if (emails.length === 0) return
+    if (phones.length === 0) return
 
     setSending(true)
     setSendResult(null)
@@ -107,18 +103,18 @@ export default function InvitePage() {
       const res = await fetch('/api/invite/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, emails }),
+        body: JSON.stringify({ projectId, phones }),
       })
       const data = await res.json()
 
       if (!res.ok) {
         setSendError(data.error || `오류가 발생했습니다. (${res.status})`)
       } else {
-        const results = data.results as { email: string; status: string }[]
+        const results = data.results as { phone: string; status: string }[]
         const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
-        const failed = results.filter((r) => r.status === 'error' || r.status === 'email_failed').length
+        const failed = results.filter((r) => r.status === 'error' || r.status === 'alimtalk_failed').length
         setSendResult({ success, failed })
-        setEmailInput('')
+        setPhoneInput('')
         await load()
       }
     } catch {
@@ -128,11 +124,11 @@ export default function InvitePage() {
     setSending(false)
   }
 
-  async function handleResend(email: string) {
+  async function handleResend(phone: string) {
     await fetch('/api/invite/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, emails: [email] }),
+      body: JSON.stringify({ projectId, phones: [phone] }),
     })
     await load()
   }
@@ -174,22 +170,22 @@ export default function InvitePage() {
         </Card>
       </div>
 
-      {/* 이메일 입력 */}
+      {/* 전화번호 입력 */}
       <Card className="mb-6">
-        <CardTitle>패널 초대 발송</CardTitle>
+        <CardTitle>카카오 알림톡 초대 발송</CardTitle>
         <p className="text-sm text-text-muted mt-1 mb-4">
-          초대할 이메일 주소를 입력하세요. 여러 명은 줄바꿈이나 쉼표로 구분하세요.
+          초대할 휴대폰 번호를 입력하세요. 여러 명은 줄바꿈이나 쉼표로 구분하세요.
         </p>
         <form onSubmit={handleSend} className="space-y-3">
           <textarea
-            value={emailInput}
-            onChange={(e) => setEmailInput(e.target.value)}
-            placeholder={"hong@company.com\nkim@company.com\nlee@company.com"}
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            placeholder={"01012345678\n01087654321\n010-1111-2222"}
             rows={4}
             className="w-full px-3.5 py-3 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy resize-none transition-colors"
           />
-          <Button type="submit" loading={sending} disabled={!emailInput.trim()}>
-            초대 이메일 발송
+          <Button type="submit" loading={sending} disabled={!phoneInput.trim()}>
+            알림톡 발송
           </Button>
         </form>
 
@@ -232,17 +228,15 @@ export default function InvitePage() {
               return (
                 <div key={inv.id} className="flex items-center justify-between py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text truncate">{inv.email}</p>
+                    <p className="text-sm font-medium text-text">{inv.phone}</p>
                     <p className="text-xs text-text-muted mt-0.5">
                       {new Date(inv.invited_at).toLocaleDateString('ko-KR')} 초대
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                    {/* 초대 상태 */}
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sl.color}`}>
                       {sl.text}
                     </span>
-                    {/* 응답 여부 (수락자만) */}
                     {inv.status === 'accepted' && (
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         responded ? 'text-go bg-go-bg' : 'text-gray-400 bg-gray-100'
@@ -250,10 +244,9 @@ export default function InvitePage() {
                         {responded ? '응답 완료' : '미응답'}
                       </span>
                     )}
-                    {/* 재발송 (대기중만) */}
                     {inv.status === 'pending' && (
                       <button
-                        onClick={() => handleResend(inv.email)}
+                        onClick={() => handleResend(inv.phone)}
                         className="text-xs text-navy hover:underline"
                       >
                         재발송
