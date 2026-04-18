@@ -33,6 +33,9 @@ export default function ClientProjectDetailPage() {
   const [aiInput, setAiInput] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [aiGenCount, setAiGenCount] = useState(0)       // 사용 횟수
+  const [aiCooldown, setAiCooldown] = useState(0)       // 쿨다운 남은 초
+  const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // 개발의뢰서 업로드
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +53,13 @@ export default function ClientProjectDetailPage() {
     if (proj?.dev_request_filename) {
       setDevRequestFilename(proj.dev_request_filename)
       if (proj.dev_request_text) setAiInput(proj.dev_request_text)
+    }
+
+    // AI 생성 횟수 및 쿨다운 복원
+    if (proj?.ai_generation_count != null) setAiGenCount(proj.ai_generation_count)
+    if (proj?.ai_generated_at) {
+      const elapsed = (Date.now() - new Date(proj.ai_generated_at).getTime()) / 1000
+      if (elapsed < 30) startCooldown(Math.ceil(30 - elapsed))
     }
 
     // 기존 설문 로드
@@ -215,6 +225,21 @@ export default function ClientProjectDetailPage() {
     }
   }
 
+  function startCooldown(seconds: number) {
+    setAiCooldown(seconds)
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current)
+    cooldownTimerRef.current = setInterval(() => {
+      setAiCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownTimerRef.current!)
+          cooldownTimerRef.current = null
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
   async function generateWithAI() {
     if (!aiInput.trim()) return
     setAiLoading(true)
@@ -223,15 +248,20 @@ export default function ClientProjectDetailPage() {
       const res = await fetch('/api/surveys/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productInfo: aiInput, category: project?.product_category }),
+        body: JSON.stringify({ productInfo: aiInput, category: project?.product_category, projectId: id }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'AI 생성 실패')
+      if (!res.ok) {
+        if (data.cooldownRemaining) startCooldown(data.cooldownRemaining)
+        throw new Error(data.error || 'AI 생성 실패')
+      }
       if (questions.length > 0) {
         if (!window.confirm('현재 문항이 AI 생성 문항으로 교체됩니다. 계속하시겠습니까?')) return
       }
       setQuestions(data.questions)
       setSelectedTemplateId('')
+      setAiGenCount(prev => prev + 1)
+      startCooldown(30)
       if (data.truncated) {
         setAiError('파일이 길어 앞부분(6,000자)만 분석했습니다. 결과를 확인하고 필요 시 내용을 직접 수정해주세요.')
       }
@@ -483,15 +513,19 @@ export default function ClientProjectDetailPage() {
                 {aiError && (
                   <p className="text-xs text-nogo mt-2">{aiError}</p>
                 )}
-                <div className="flex items-center gap-3 mt-3">
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
                   <Button
                     onClick={generateWithAI}
                     loading={aiLoading}
-                    disabled={!aiInput.trim() || aiLoading}
+                    disabled={!aiInput.trim() || aiLoading || aiCooldown > 0 || aiGenCount >= 5}
                   >
-                    {aiLoading ? 'AI 생성 중...' : '✨ 문항 자동 생성'}
+                    {aiLoading ? 'AI 생성 중...' : aiCooldown > 0 ? `⏳ ${aiCooldown}초 후 가능` : '✨ 문항 자동 생성'}
                   </Button>
-                  {questions.length > 0 && (
+                  {/* 남은 횟수 표시 */}
+                  <span className={`text-xs font-medium ${aiGenCount >= 5 ? 'text-nogo' : aiGenCount >= 3 ? 'text-gold' : 'text-text-muted'}`}>
+                    {aiGenCount >= 5 ? '생성 한도 초과 (5/5회)' : `잔여 ${5 - aiGenCount}회 (${aiGenCount}/5회 사용)`}
+                  </span>
+                  {questions.length > 0 && aiGenCount < 5 && (
                     <span className="text-xs text-text-muted">{questions.length}개 문항 생성됨 — 아래에서 수정 가능</span>
                   )}
                 </div>

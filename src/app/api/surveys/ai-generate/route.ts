@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdmin } from '@supabase/supabase-js'
 
 export const maxDuration = 60 // Vercel Pro 이상에서 60초 허용
 
 const MAX_INPUT_CHARS = 6000
+const AI_GEN_LIMIT = 5        // 프로젝트당 최대 생성 횟수
+const AI_GEN_COOLDOWN_SEC = 30 // 연속 호출 방지 쿨다운 (초)
 
 // 항상 마지막에 추가되는 고정 주관식 문항
 const FIXED_TEXT_QUESTIONS = [
@@ -37,6 +41,7 @@ function getAnthropicApiKey(): string | undefined {
 }
 
 export async function POST(req: NextRequest) {
+  // ── 1. API 키 확인 ──────────────────────────────────────────────
   const apiKey = getAnthropicApiKey()
   if (!apiKey) {
     return NextResponse.json(
@@ -44,15 +49,65 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+
+  // ── 2. 인증 확인 ─────────────────────────────────────────────────
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+  }
+
+  // ── 3. 요청 파싱 ─────────────────────────────────────────────────
+  const { productInfo, category, projectId } = await req.json()
+
+  if (!productInfo?.trim()) {
+    return NextResponse.json({ error: '제품 정보를 입력해주세요' }, { status: 400 })
+  }
+
+  // ── 4. 사용 한도 & 쿨다운 체크 (projectId 있을 때만) ──────────────
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  if (projectId) {
+    const { data: proj } = await admin
+      .from('projects')
+      .select('id, client_id, ai_generation_count, ai_generated_at')
+      .eq('id', projectId)
+      .single()
+
+    if (!proj) {
+      return NextResponse.json({ error: '프로젝트를 찾을 수 없습니다.' }, { status: 404 })
+    }
+    if (proj.client_id !== user.id) {
+      return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
+    }
+
+    const count: number = proj.ai_generation_count ?? 0
+    if (count >= AI_GEN_LIMIT) {
+      return NextResponse.json(
+        { error: `AI 문항 생성은 프로젝트당 최대 ${AI_GEN_LIMIT}회까지 가능합니다. (현재 ${count}/${AI_GEN_LIMIT}회 사용)` },
+        { status: 429 }
+      )
+    }
+
+    if (proj.ai_generated_at) {
+      const elapsed = (Date.now() - new Date(proj.ai_generated_at).getTime()) / 1000
+      if (elapsed < AI_GEN_COOLDOWN_SEC) {
+        const remaining = Math.ceil(AI_GEN_COOLDOWN_SEC - elapsed)
+        return NextResponse.json(
+          { error: `${remaining}초 후 다시 시도해주세요.`, cooldownRemaining: remaining },
+          { status: 429 }
+        )
+      }
+    }
+  }
+
+  // ── 5. AI 생성 ───────────────────────────────────────────────────
   const client = new Anthropic({ apiKey })
 
   try {
-    const { productInfo, category } = await req.json()
-
-    if (!productInfo?.trim()) {
-      return NextResponse.json({ error: '제품 정보를 입력해주세요' }, { status: 400 })
-    }
-
     const truncated = productInfo.length > MAX_INPUT_CHARS
     const safeInput = truncated
       ? productInfo.slice(0, MAX_INPUT_CHARS) + '\n...(이하 생략)'
@@ -118,6 +173,23 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
       throw new Error('올바른 형식의 응답이 아닙니다')
     }
 
+    // ── 6. 성공 시 카운터 업데이트 ──────────────────────────────────
+    if (projectId) {
+      const { data: proj } = await admin
+        .from('projects')
+        .select('ai_generation_count')
+        .eq('id', projectId)
+        .single()
+
+      await admin
+        .from('projects')
+        .update({
+          ai_generation_count: ((proj?.ai_generation_count ?? 0) as number) + 1,
+          ai_generated_at: new Date().toISOString(),
+        })
+        .eq('id', projectId)
+    }
+
     const now = Date.now()
 
     // AI 생성 문항 정규화 (타입별로 필요없는 필드 제거)
@@ -138,7 +210,6 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
         }
       }
       if (type === 'choice') {
-        // scale/scaleLabels 제거
         const { scale: _s, scaleLabels: _sl, ...rest } = base as Record<string, unknown>
         void _s; void _sl
         return { ...rest, choices: (q.choices as string[]) ?? ['예', '아니오'] }
