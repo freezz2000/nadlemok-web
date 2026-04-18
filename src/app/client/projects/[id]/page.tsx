@@ -16,7 +16,6 @@ export default function ClientProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const supabase = createClient()
   const [project, setProject] = useState<Project | null>(null)
-  const [surveyStats, setSurveyStats] = useState({ total: 0, responded: 0 })
 
   // 설문 설정
   const [templates, setTemplates] = useState<SurveyTemplate[]>([])
@@ -50,11 +49,6 @@ export default function ClientProjectDetailPage() {
       // 연결된 템플릿 ID 복원
       if (survey.template_id) setSelectedTemplateId(survey.template_id)
 
-      const { count: totalPanels } = await supabase
-        .from('survey_panels').select('*', { count: 'exact', head: true }).eq('survey_id', survey.id)
-      const { count: responded } = await supabase
-        .from('survey_responses').select('*', { count: 'exact', head: true }).eq('survey_id', survey.id)
-      setSurveyStats({ total: totalPanels || 0, responded: responded || 0 })
     }
 
     if (proj?.status === 'draft') {
@@ -307,14 +301,6 @@ export default function ClientProjectDetailPage() {
           </div>
         )}
       </Card>
-
-      {/* 기본 정보 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card padding="sm"><p className="text-xs text-text-muted">플랜</p><p className="text-lg font-bold text-navy">{project.plan?.toUpperCase()}</p></Card>
-        <Card padding="sm"><p className="text-xs text-text-muted">패널 규모</p><p className="text-lg font-bold text-text">{project.panel_size}명</p></Card>
-        <Card padding="sm"><p className="text-xs text-text-muted">테스트 기간</p><p className="text-lg font-bold text-text">{project.test_duration}일</p></Card>
-        <Card padding="sm"><p className="text-xs text-text-muted">응답 진행</p><p className="text-lg font-bold text-go">{surveyStats.responded} / {surveyStats.total}</p></Card>
-      </div>
 
       {/* === draft 상태: 설문 편집 === */}
       {isDraft && (

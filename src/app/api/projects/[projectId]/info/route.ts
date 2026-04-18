@@ -18,7 +18,7 @@ export async function GET(
 
   const { data: project } = await admin
     .from('projects')
-    .select('id, product_name, panel_source, external_panel_count, delivery_service, quote_total')
+    .select('id, product_name, plan, panel_size, test_duration, panel_source, external_panel_count, delivery_service, quote_total')
     .eq('id', projectId)
     .single()
 

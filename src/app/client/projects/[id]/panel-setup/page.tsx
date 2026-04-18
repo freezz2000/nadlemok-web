@@ -19,6 +19,9 @@ export default function PanelSetupPage() {
   const router = useRouter()
 
   const [productName, setProductName] = useState('')
+  const [plan, setPlan] = useState<string>('')
+  const [panelSize, setPanelSize] = useState<number | null>(null)
+  const [testDuration, setTestDuration] = useState<number | null>(null)
   const [selected, setSelected] = useState<PanelSource | null>(null)
   const [externalCount, setExternalCount] = useState(30)
   const [deliveryService, setDeliveryService] = useState(false)
@@ -31,7 +34,12 @@ export default function PanelSetupPage() {
   useEffect(() => {
     fetch(`/api/projects/${projectId}/info`)
       .then(r => r.json())
-      .then(d => { if (d.product_name) setProductName(d.product_name) })
+      .then(d => {
+        if (d.product_name) setProductName(d.product_name)
+        if (d.plan) setPlan(d.plan)
+        if (d.panel_size != null) setPanelSize(d.panel_size)
+        if (d.test_duration != null) setTestDuration(d.test_duration)
+      })
       .catch(() => {})
   }, [projectId])
 
@@ -84,6 +92,26 @@ export default function PanelSetupPage() {
         {productName && (
           <p className="text-sm text-text-muted mt-1.5">{productName}</p>
         )}
+      </div>
+
+      {/* 프로젝트 기본 정보 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="bg-white border border-border rounded-xl px-4 py-3">
+          <p className="text-xs text-text-muted">플랜</p>
+          <p className="text-lg font-bold text-navy mt-0.5">{plan ? plan.toUpperCase() : '—'}</p>
+        </div>
+        <div className="bg-white border border-border rounded-xl px-4 py-3">
+          <p className="text-xs text-text-muted">패널 규모</p>
+          <p className="text-lg font-bold text-text mt-0.5">{panelSize != null ? `${panelSize}명` : '—'}</p>
+        </div>
+        <div className="bg-white border border-border rounded-xl px-4 py-3">
+          <p className="text-xs text-text-muted">테스트 기간</p>
+          <p className="text-lg font-bold text-text mt-0.5">{testDuration != null ? `${testDuration}일` : '—'}</p>
+        </div>
+        <div className="bg-white border border-border rounded-xl px-4 py-3">
+          <p className="text-xs text-text-muted">응답 진행</p>
+          <p className="text-lg font-bold text-go mt-0.5">0 / 0</p>
+        </div>
       </div>
 
       {/* 선택 카드 2개 */}
