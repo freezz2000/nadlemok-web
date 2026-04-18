@@ -26,6 +26,10 @@ export default function TemplateEditPage() {
 
   async function loadTemplate() {
     const { data } = await supabase.from('survey_templates').select('*').eq('id', id).single()
+    if (data) {
+      // type이 없는 구형 문항은 기본값 'scale'로 정규화
+      data.questions = (data.questions || []).map((q: SurveyQuestion) => ({ type: 'scale' as const, ...q }))
+    }
     setTemplate(data)
   }
 
