@@ -56,7 +56,7 @@ export default function ServiceApplyPage() {
         return
       }
 
-      router.push(`/client/projects/${data.projectId}`)
+      router.push(`/client/projects/${data.projectId}/panel-setup`)
     } catch (err) {
       console.error('apply error:', err)
       setError('오류가 발생했습니다. 다시 시도해주세요.')
