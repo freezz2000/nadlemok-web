@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. 사용 한도 & 쿨다운 체크 (projectId 있을 때만) ──────────────
-  const admin = createClient(
+  const admin = createAdmin(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
