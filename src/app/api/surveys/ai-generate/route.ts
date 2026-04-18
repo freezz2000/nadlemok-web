@@ -3,12 +3,20 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 60 // Vercel Pro 이상에서 60초 허용
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 // 입력 최대 길이 (토큰 절약 + 안정성)
 const MAX_INPUT_CHARS = 6000
 
 export async function POST(req: NextRequest) {
+  // API 키를 요청 시점에 읽어 client 생성 (모듈 레벨 초기화 시 env가 undefined일 수 있음)
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. Vercel 환경변수를 확인하고 재배포해주세요.' },
+      { status: 500 }
+    )
+  }
+  const client = new Anthropic({ apiKey })
+
   try {
     const { productInfo, category } = await req.json()
 
