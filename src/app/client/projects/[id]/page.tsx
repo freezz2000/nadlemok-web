@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Card, { CardTitle } from '@/components/ui/Card'
@@ -34,11 +34,23 @@ export default function ClientProjectDetailPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
 
+  // 개발의뢰서 업로드
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [devRequestFilename, setDevRequestFilename] = useState('')
+  const [fileUploading, setFileUploading] = useState(false)
+  const [fileError, setFileError] = useState('')
+
   useEffect(() => { load() }, [id])
 
   async function load() {
     const { data: proj } = await supabase.from('projects').select('*').eq('id', id).single()
     setProject(proj)
+
+    // 기존 개발의뢰서 로드
+    if (proj?.dev_request_filename) {
+      setDevRequestFilename(proj.dev_request_filename)
+      if (proj.dev_request_text) setAiInput(proj.dev_request_text)
+    }
 
     // 기존 설문 로드
     const { data: surveys } = await supabase.from('surveys').select('*').eq('project_id', id)
@@ -177,6 +189,29 @@ export default function ClientProjectDetailPage() {
     }
     setConfirming(false)
     window.location.href = `/client/projects/${id}/panel-setup`
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFileUploading(true)
+    setFileError('')
+
+    const form = new FormData()
+    form.append('file', file)
+
+    try {
+      const res = await fetch(`/api/projects/${id}/dev-request`, { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '파일 처리 중 오류가 발생했습니다')
+      setAiInput(data.text)
+      setDevRequestFilename(data.filename)
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : '파일 처리 중 오류가 발생했습니다')
+    } finally {
+      setFileUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   async function generateWithAI() {
@@ -383,9 +418,57 @@ export default function ClientProjectDetailPage() {
               <div className="mb-5 p-4 bg-navy/[0.03] border border-navy/10 rounded-xl">
                 <p className="text-xs font-medium text-navy mb-1">제품 정보 입력</p>
                 <p className="text-xs text-text-muted mb-3">
-                  제품개발의뢰서 내용을 붙여넣거나, 제품의 특징·성분·타겟을 자유롭게 입력하세요.
+                  개발의뢰서를 업로드하거나, 제품의 특징·성분·타겟을 직접 입력하세요.
                   AI가 관능 평가에 최적화된 설문 문항을 자동으로 생성합니다.
                 </p>
+
+                {/* 파일 업로드 영역 */}
+                <div className="mb-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.doc,.txt"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="dev-request-file"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={fileUploading}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-navy/20 bg-white text-navy text-xs font-medium hover:bg-navy/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {fileUploading ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                          파일 읽는 중...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </svg>
+                          개발의뢰서 업로드
+                        </>
+                      )}
+                    </button>
+                    {devRequestFilename ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-go bg-go/10 px-2 py-1 rounded-full">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {devRequestFilename}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-muted">PDF, DOCX, TXT 지원 · 최대 10MB</span>
+                    )}
+                  </div>
+                  {fileError && (
+                    <p className="text-xs text-nogo mt-1.5">{fileError}</p>
+                  )}
+                </div>
+
                 <textarea
                   value={aiInput}
                   onChange={(e) => setAiInput(e.target.value)}
