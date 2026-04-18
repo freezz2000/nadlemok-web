@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       : productInfo
 
     const message = await client.messages.create({
-      model: 'claude-3-haiku-20240307', // 빠르고 범용적으로 사용 가능한 모델
+      model: 'claude-sonnet-4-6', // 이 계정에서 사용 가능한 Sonnet 4.6 모델
       max_tokens: 4096,
       messages: [
         {
