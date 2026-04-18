@@ -231,6 +231,9 @@ export default function ClientProjectDetailPage() {
       }
       setQuestions(data.questions)
       setSelectedTemplateId('')
+      if (data.truncated) {
+        setAiError('파일이 길어 앞부분(6,000자)만 분석했습니다. 결과를 확인하고 필요 시 내용을 직접 수정해주세요.')
+      }
     } catch (e) {
       setAiError(e instanceof Error ? e.message : 'AI 문항 생성에 실패했습니다')
     } finally {
