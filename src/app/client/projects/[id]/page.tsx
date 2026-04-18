@@ -12,18 +12,11 @@ import { QUESTION_GROUPS, DEFAULT_SCALE_LABELS, getGroupConfig } from '@/lib/tem
 import SurveyQuestionCard from '@/components/SurveyQuestionCard'
 import type { Project, ProjectStatus, SurveyTemplate, SurveyQuestion, QuestionGroup } from '@/lib/types'
 
-const genderOptions = ['여성', '남성']
-const ageGroupOptions = ['10대', '20대', '30대', '40대', '50대 이상']
-const skinTypeOptions = ['건성', '복합성', '지성', '중성', '민감성']
-
 export default function ClientProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const supabase = createClient()
   const [project, setProject] = useState<Project | null>(null)
   const [surveyStats, setSurveyStats] = useState({ total: 0, responded: 0 })
-
-  // 코호트 설정
-  const [cohort, setCohort] = useState({ genders: [] as string[], ageGroups: [] as string[], skinTypes: [] as string[] })
 
   // 설문 설정
   const [templates, setTemplates] = useState<SurveyTemplate[]>([])
@@ -48,8 +41,6 @@ export default function ClientProjectDetailPage() {
     const { data: proj } = await supabase.from('projects').select('*').eq('id', id).single()
     setProject(proj)
 
-    if (proj?.target_cohort) setCohort(proj.target_cohort)
-
     // 기존 설문 로드
     const { data: surveys } = await supabase.from('surveys').select('*').eq('project_id', id)
     if (surveys?.length) {
@@ -71,13 +62,6 @@ export default function ClientProjectDetailPage() {
         .from('survey_templates').select('*').order('is_default', { ascending: false })
       setTemplates(tmpls || [])
     }
-  }
-
-  function toggleCohort(field: 'genders' | 'ageGroups' | 'skinTypes', value: string) {
-    setCohort((prev) => ({
-      ...prev,
-      [field]: prev[field].includes(value) ? prev[field].filter((v) => v !== value) : [...prev[field], value],
-    }))
   }
 
   // 템플릿 불러오기 — 원본 템플릿은 절대 수정하지 않음 (깊은 복사)
@@ -158,8 +142,6 @@ export default function ClientProjectDetailPage() {
     if (!project) return
     setSaving(true)
 
-    await supabase.from('projects').update({ target_cohort: cohort }).eq('id', id)
-
     if (existingSurveyId) {
       await supabase.from('surveys').update({
         questions,
@@ -199,7 +181,6 @@ export default function ClientProjectDetailPage() {
         status: 'draft',
       })
     }
-    await supabase.from('projects').update({ target_cohort: cohort }).eq('id', id)
     setConfirming(false)
     window.location.href = `/client/projects/${id}/panel-setup`
   }
@@ -335,47 +316,9 @@ export default function ClientProjectDetailPage() {
         <Card padding="sm"><p className="text-xs text-text-muted">응답 진행</p><p className="text-lg font-bold text-go">{surveyStats.responded} / {surveyStats.total}</p></Card>
       </div>
 
-      {/* === draft 상태: 코호트 + 설문 편집 === */}
+      {/* === draft 상태: 설문 편집 === */}
       {isDraft && (
         <>
-          {/* 코호트 선택 */}
-          <Card className="mb-6">
-            <CardTitle>타겟 코호트 선택</CardTitle>
-            <p className="text-xs text-text-muted mt-1 mb-4">원하는 패널 조건을 복수 선택해주세요</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-2">성별</label>
-                <div className="flex gap-2">
-                  {genderOptions.map((g) => (
-                    <button key={g} type="button" onClick={() => toggleCohort('genders', g)}
-                      className={`flex-1 py-2 rounded-lg border text-sm transition-all ${cohort.genders.includes(g) ? 'border-navy bg-navy/5 font-medium' : 'border-border hover:border-navy/30'}`}
-                    >{g}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-2">연령대</label>
-                <div className="flex flex-wrap gap-2">
-                  {ageGroupOptions.map((a) => (
-                    <button key={a} type="button" onClick={() => toggleCohort('ageGroups', a)}
-                      className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${cohort.ageGroups.includes(a) ? 'border-navy bg-navy/5 font-medium' : 'border-border hover:border-navy/30'}`}
-                    >{a}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-text-muted mb-2">피부타입</label>
-                <div className="flex flex-wrap gap-2">
-                  {skinTypeOptions.map((s) => (
-                    <button key={s} type="button" onClick={() => toggleCohort('skinTypes', s)}
-                      className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${cohort.skinTypes.includes(s) ? 'border-navy bg-navy/5 font-medium' : 'border-border hover:border-navy/30'}`}
-                    >{s}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-
           {/* 설문 설정 */}
           <Card className="mb-6">
             <div className="flex items-center justify-between mb-1">
