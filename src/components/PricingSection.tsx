@@ -105,10 +105,6 @@ export default function PricingSection() {
           </div>
         </div>
 
-        {/* ── 운영대행료 안내 ── */}
-        <p className="text-center text-sm text-text-muted max-w-2xl mx-auto">
-          {credits.operationFee}
-        </p>
 
       </div>
     </section>
