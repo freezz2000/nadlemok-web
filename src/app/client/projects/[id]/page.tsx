@@ -36,6 +36,12 @@ export default function ClientProjectDetailPage() {
   const [confirming, setConfirming] = useState(false)
   const [showSurveyQuestions, setShowSurveyQuestions] = useState(true)
 
+  // AI 모드
+  const [surveyMode, setSurveyMode] = useState<'template' | 'ai'>('template')
+  const [aiInput, setAiInput] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+
   useEffect(() => { load() }, [id])
 
   async function load() {
@@ -198,6 +204,30 @@ export default function ClientProjectDetailPage() {
     window.location.href = `/client/projects/${id}/panel-setup`
   }
 
+  async function generateWithAI() {
+    if (!aiInput.trim()) return
+    setAiLoading(true)
+    setAiError('')
+    try {
+      const res = await fetch('/api/surveys/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productInfo: aiInput, category: project?.product_category }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'AI 생성 실패')
+      if (questions.length > 0) {
+        if (!window.confirm('현재 문항이 AI 생성 문항으로 교체됩니다. 계속하시겠습니까?')) return
+      }
+      setQuestions(data.questions)
+      setSelectedTemplateId('')
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : 'AI 문항 생성에 실패했습니다')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   if (!project) return <p className="text-text-muted p-6">로딩중...</p>
 
   const isDraft = project.status === 'draft'
@@ -352,32 +382,51 @@ export default function ClientProjectDetailPage() {
               <CardTitle>설문 설정</CardTitle>
               <span className="text-sm text-text-muted">{questions.length}개 문항</span>
             </div>
-            <p className="text-xs text-text-muted mb-4">템플릿을 불러온 후 문항을 자유롭게 수정하세요. 원본 템플릿은 변경되지 않습니다.</p>
 
-            {/* 템플릿 선택/표시
-                selectedTemplateId(string)로 판단 — 비동기 templates 로드 완료 전에
-                select가 잠깐 보여서 사용자가 재선택하면 수정 문항이 덮어씌워지는 버그 방지 */}
-            <div className="mb-5 p-3 bg-surface rounded-lg">
-              {selectedTemplateId ? (
-                <div className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-text">
-                      템플릿: {selectedTemplate?.name ?? '로딩 중...'}
-                    </p>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      현재 {questions.length}개 문항 (템플릿 연결 해제해도 문항은 유지됩니다)
-                    </p>
+            {/* 모드 탭 */}
+            <div className="flex gap-1 p-1 bg-surface rounded-lg mb-4 w-fit">
+              <button
+                type="button"
+                onClick={() => setSurveyMode('template')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  surveyMode === 'template' ? 'bg-white text-navy shadow-sm' : 'text-text-muted hover:text-text'
+                }`}
+              >
+                📋 템플릿
+              </button>
+              <button
+                type="button"
+                onClick={() => setSurveyMode('ai')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  surveyMode === 'ai' ? 'bg-white text-navy shadow-sm' : 'text-text-muted hover:text-text'
+                }`}
+              >
+                ✨ AI 생성
+              </button>
+            </div>
+
+            {/* 템플릿 모드 */}
+            {surveyMode === 'template' && (
+              <div className="mb-5 p-3 bg-surface rounded-lg">
+                <p className="text-xs text-text-muted mb-3">템플릿을 불러온 후 문항을 자유롭게 수정하세요. 원본 템플릿은 변경되지 않습니다.</p>
+                {selectedTemplateId ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-text">
+                        템플릿: {selectedTemplate?.name ?? '로딩 중...'}
+                      </p>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        현재 {questions.length}개 문항 (연결 해제해도 문항은 유지됩니다)
+                      </p>
+                    </div>
+                    <button
+                      onClick={clearTemplate}
+                      className="text-xs px-2.5 py-1 border border-border rounded-lg text-text-muted hover:border-nogo/30 hover:text-nogo transition-all"
+                    >
+                      연결 해제
+                    </button>
                   </div>
-                  <button
-                    onClick={clearTemplate}
-                    className="text-xs px-2.5 py-1 border border-border rounded-lg text-text-muted hover:border-nogo/30 hover:text-nogo transition-all"
-                  >
-                    연결 해제
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-xs font-medium text-text-muted mb-2">템플릿 불러오기</p>
+                ) : (
                   <select
                     value=""
                     onChange={(e) => {
@@ -396,9 +445,42 @@ export default function ClientProjectDetailPage() {
                       </option>
                     ))}
                   </select>
+                )}
+              </div>
+            )}
+
+            {/* AI 생성 모드 */}
+            {surveyMode === 'ai' && (
+              <div className="mb-5 p-4 bg-navy/[0.03] border border-navy/10 rounded-xl">
+                <p className="text-xs font-medium text-navy mb-1">제품 정보 입력</p>
+                <p className="text-xs text-text-muted mb-3">
+                  제품개발의뢰서 내용을 붙여넣거나, 제품의 특징·성분·타겟을 자유롭게 입력하세요.
+                  AI가 관능 평가에 최적화된 설문 문항을 자동으로 생성합니다.
+                </p>
+                <textarea
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  placeholder={`예시:\n제품명: 수분 세럼 A\n타겟: 30~40대 건성 피부\n주요 성분: 히알루론산 5%, 세라마이드\n특징: 빠른 흡수, 끈적임 없는 가벼운 제형\n기대 효과: 즉각 보습, 피부 장벽 강화`}
+                  rows={7}
+                  className="w-full px-3 py-2.5 border border-border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-navy/20 bg-white"
+                />
+                {aiError && (
+                  <p className="text-xs text-nogo mt-2">{aiError}</p>
+                )}
+                <div className="flex items-center gap-3 mt-3">
+                  <Button
+                    onClick={generateWithAI}
+                    loading={aiLoading}
+                    disabled={!aiInput.trim() || aiLoading}
+                  >
+                    {aiLoading ? 'AI 생성 중...' : '✨ 문항 자동 생성'}
+                  </Button>
+                  {questions.length > 0 && (
+                    <span className="text-xs text-text-muted">{questions.length}개 문항 생성됨 — 아래에서 수정 가능</span>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* 문항 목록 (전체 편집 가능) */}
             {questions.length > 0 ? (

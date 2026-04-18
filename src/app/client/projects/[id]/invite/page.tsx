@@ -35,6 +35,12 @@ export default function InvitePage() {
   const [sendError, setSendError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // 설문 상태
+  const [surveyId, setSurveyId] = useState<string | null>(null)
+  const [surveyStatus, setSurveyStatus] = useState<string | null>(null)
+  const [startingsurvey, setStartingSurvey] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
 
@@ -44,6 +50,17 @@ export default function InvitePage() {
       .eq('id', projectId)
       .single()
     if (proj) setProductName(proj.product_name)
+
+    // 설문 로드
+    const { data: surveys } = await supabase
+      .from('surveys')
+      .select('id, status')
+      .eq('project_id', projectId)
+      .limit(1)
+    if (surveys?.[0]) {
+      setSurveyId(surveys[0].id)
+      setSurveyStatus(surveys[0].status)
+    }
 
     const { data: invs } = await supabase
       .from('project_invitations')
@@ -56,27 +73,18 @@ export default function InvitePage() {
       .filter((inv) => inv.panel_id && inv.status === 'accepted')
       .map((inv) => inv.panel_id as string)
 
-    if (acceptedPanelIds.length > 0) {
-      const { data: surveys } = await supabase
-        .from('surveys')
-        .select('id')
-        .eq('project_id', projectId)
-        .limit(1)
-      const surveyId = surveys?.[0]?.id
+    if (acceptedPanelIds.length > 0 && surveys?.[0]?.id) {
+      const { data: panels } = await supabase
+        .from('survey_panels')
+        .select('panel_id, status')
+        .eq('survey_id', surveys[0].id)
+        .in('panel_id', acceptedPanelIds)
 
-      if (surveyId) {
-        const { data: panels } = await supabase
-          .from('survey_panels')
-          .select('panel_id, status')
-          .eq('survey_id', surveyId)
-          .in('panel_id', acceptedPanelIds)
-
-        const map: Record<string, boolean> = {}
-        ;(panels as PanelResponse[] || []).forEach((p) => {
-          map[p.panel_id] = p.status === 'completed'
-        })
-        setResponseMap(map)
-      }
+      const map: Record<string, boolean> = {}
+      ;(panels as PanelResponse[] || []).forEach((p) => {
+        map[p.panel_id] = p.status === 'completed'
+      })
+      setResponseMap(map)
     }
 
     setLoading(false)
@@ -133,13 +141,34 @@ export default function InvitePage() {
     await load()
   }
 
-  const statusLabel = (inv: Invitation) => {
-    if (inv.status === 'accepted') return { text: '수락', color: 'text-green-600 bg-green-50' }
-    if (inv.status === 'expired' || new Date(inv.expires_at) < new Date()) return { text: '만료', color: 'text-gray-400 bg-gray-100' }
-    return { text: '대기중', color: 'text-amber-600 bg-amber-50' }
+  async function handleStartSurvey() {
+    if (!surveyId) return
+    setStartingSurvey(true)
+    setStartError(null)
+    try {
+      const res = await fetch('/api/surveys/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ surveyId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || '설문 시작에 실패했습니다')
+      setSurveyStatus('active')
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : '오류가 발생했습니다')
+    } finally {
+      setStartingSurvey(false)
+    }
   }
 
-  const acceptedCount = invitations.filter((i) => i.status === 'accepted').length
+  const statusLabel = (inv: Invitation) => {
+    if (inv.status === 'accepted') return { text: '가입 완료', color: 'text-green-600 bg-green-50' }
+    if (inv.status === 'expired' || new Date(inv.expires_at) < new Date()) return { text: '만료', color: 'text-gray-400 bg-gray-100' }
+    return { text: '미가입', color: 'text-amber-600 bg-amber-50' }
+  }
+
+  const registeredCount = invitations.filter((i) => i.status === 'accepted').length
+  const pendingCount = invitations.filter((i) => i.status === 'pending').length
   const respondedCount = Object.values(responseMap).filter(Boolean).length
 
   return (
@@ -155,14 +184,18 @@ export default function InvitePage() {
       </div>
 
       {/* 현황 요약 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-4 gap-3 mb-6">
         <Card padding="sm">
           <p className="text-xs text-text-muted">초대 발송</p>
           <p className="text-2xl font-bold text-text">{invitations.length}</p>
         </Card>
         <Card padding="sm">
-          <p className="text-xs text-text-muted">수락 완료</p>
-          <p className="text-2xl font-bold text-navy">{acceptedCount}</p>
+          <p className="text-xs text-text-muted">가입 완료</p>
+          <p className="text-2xl font-bold text-navy">{registeredCount}</p>
+        </Card>
+        <Card padding="sm">
+          <p className="text-xs text-text-muted">미가입</p>
+          <p className="text-2xl font-bold text-amber-500">{pendingCount}</p>
         </Card>
         <Card padding="sm">
           <p className="text-xs text-text-muted">설문 응답</p>
@@ -170,11 +203,43 @@ export default function InvitePage() {
         </Card>
       </div>
 
+      {/* 설문 시작 버튼 */}
+      {surveyId && surveyStatus !== 'active' && registeredCount > 0 && (
+        <Card className="mb-6 border-navy/20 bg-navy/[0.02]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-navy">설문을 시작할 준비가 됐나요?</p>
+              <p className="text-xs text-text-muted mt-1">
+                가입 완료된 패널 {registeredCount}명이 설문에 응답할 수 있습니다.
+                {pendingCount > 0 && ` (아직 미가입 ${pendingCount}명)`}
+              </p>
+            </div>
+            <Button onClick={handleStartSurvey} loading={startingsurvey}>
+              설문 시작하기
+            </Button>
+          </div>
+          {startError && (
+            <p className="text-xs text-nogo mt-3">{startError}</p>
+          )}
+        </Card>
+      )}
+
+      {/* 설문 진행 중 배너 */}
+      {surveyStatus === 'active' && (
+        <div className="mb-6 p-4 rounded-xl bg-go-bg border border-go/20 flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-go animate-pulse flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-go">설문 진행 중</p>
+            <p className="text-xs text-text-muted mt-0.5">패널들이 설문에 응답하고 있습니다.</p>
+          </div>
+        </div>
+      )}
+
       {/* 전화번호 입력 */}
       <Card className="mb-6">
         <CardTitle>카카오 알림톡 초대 발송</CardTitle>
         <p className="text-sm text-text-muted mt-1 mb-4">
-          초대할 휴대폰 번호를 입력하세요. 여러 명은 줄바꿈이나 쉼표로 구분하세요.
+          초대할 휴대폰 번호를 입력하세요. 링크를 통해 패널로 가입하고 바로 설문에 참여할 수 있습니다.
         </p>
         <form onSubmit={handleSend} className="space-y-3">
           <textarea
