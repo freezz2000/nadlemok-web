@@ -100,7 +100,7 @@ export default function PricingSection() {
               href="/register"
               className="block text-center py-3 rounded-lg text-sm font-medium bg-gold text-navy hover:bg-yellow-300 transition-colors font-semibold"
             >
-              무료로 시작하기
+              시작하기
             </Link>
           </div>
         </div>
