@@ -3,26 +3,28 @@ import Anthropic from '@anthropic-ai/sdk'
 
 export const maxDuration = 60 // Vercel Pro 이상에서 60초 허용
 
-// 입력 최대 길이 (토큰 절약 + 안정성)
 const MAX_INPUT_CHARS = 6000
 
+// 항상 마지막에 추가되는 고정 주관식 문항
+const FIXED_TEXT_QUESTIONS = [
+  {
+    label: '이 제품의 아쉬운 점이나 단점을 자유롭게 적어주세요.',
+    group: 'overall',
+  },
+  {
+    label: '이 제품이 개선되었으면 하는 점을 자유롭게 적어주세요.',
+    group: 'overall',
+  },
+]
+
 export async function POST(req: NextRequest) {
-  // process.env 직접 접근 + SDK 자체 readEnv 둘 다 시도
   const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env['ANTHROPIC_API_KEY']
   if (!apiKey) {
     return NextResponse.json(
-      {
-        error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.',
-        debug: {
-          nodeEnv: process.env.NODE_ENV,
-          supabaseExists: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-          anthropicKeyLength: (process.env.ANTHROPIC_API_KEY ?? '').length,
-        },
-      },
+      { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. Vercel 환경변수를 확인하고 재배포해주세요.' },
       { status: 500 }
     )
   }
-  // apiKey를 명시하지 않으면 SDK가 자체적으로 process.env.ANTHROPIC_API_KEY를 읽음
   const client = new Anthropic({ apiKey })
 
   try {
@@ -32,14 +34,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '제품 정보를 입력해주세요' }, { status: 400 })
     }
 
-    // 너무 긴 입력 자동 절삭 (Excel CSV 등)
     const truncated = productInfo.length > MAX_INPUT_CHARS
     const safeInput = truncated
       ? productInfo.slice(0, MAX_INPUT_CHARS) + '\n...(이하 생략)'
       : productInfo
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6', // 이 계정에서 사용 가능한 Sonnet 4.6 모델
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       messages: [
         {
@@ -51,11 +52,16 @@ ${safeInput}
 ${category ? `카테고리: ${category}` : ''}
 
 다음 규칙을 반드시 따라주세요:
-1. 문항은 4점 척도(1=전혀 그렇지 않다, 2=그렇지 않다, 3=그렇다, 4=매우 그렇다)로 구성
-2. Kill Signal 문항(심각한 결함 감지용): 자극감·끈적임·이물감·냄새 이상 등 치명적 불만 관련 2~3개
-3. 일반 평가 문항: 제형감·흡수력·발림성·보습감·향·전반적 만족도 등 7~10개
-4. 마지막에 추천 의향 1개, 구매 의향 1개 반드시 포함
-5. 아래 JSON 형식으로만 응답 (다른 텍스트 없이)
+1. Kill Signal 문항 2~3개: 자극감·끈적임·이물감·냄새 이상 등 치명적 불만 감지용 — type: "scale" (4점 척도)
+2. 일반 평가 문항 7~10개: 제형감·흡수력·발림성·보습감·향·전반적 만족도 등 — type: "scale" (4점 척도)
+3. 추천 의향 1개, 구매 의향 1개 — type: "scale" (4점 척도)
+
+문항 type 규칙:
+- "scale": 4점 척도 문항 (scale=4, scaleLabels 필수)
+- "text": 주관식 서술형 (scale·scaleLabels 없음)
+- "choice": 객관식 선택형 (choices 배열 필수)
+
+아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON):
 
 [
   {
@@ -70,10 +76,10 @@ ${category ? `카테고리: ${category}` : ''}
   }
 ]
 
-group 값은 다음 중 하나: "killsignal" | "texture" | "absorption" | "scent" | "moisture" | "overall" | "purchase"
-isKillSignal은 Kill Signal 문항만 true
-
-JSON 배열만 반환하고, 마크다운 코드블록 없이 순수 JSON만 출력하세요.`,
+group 값: "killsignal" | "texture" | "absorption" | "scent" | "moisture" | "overall" | "purchase"
+isKillSignal: Kill Signal 문항만 true, 나머지 false
+type이 "text"인 경우 scale·scaleLabels 필드 생략
+type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
         },
       ],
     })
@@ -85,7 +91,6 @@ JSON 배열만 반환하고, 마크다운 코드블록 없이 순수 JSON만 출
     try {
       questions = JSON.parse(raw)
     } catch {
-      // 코드블록으로 감싸인 경우 제거 후 재시도
       const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim()
       questions = JSON.parse(cleaned)
     }
@@ -94,24 +99,62 @@ JSON 배열만 반환하고, 마크다운 코드블록 없이 순수 JSON만 출
       throw new Error('올바른 형식의 응답이 아닙니다')
     }
 
-    // key 중복 방지 및 order 재정렬
     const now = Date.now()
-    const normalized = questions.map((q: Record<string, unknown>, i: number) => ({
-      ...q,
-      key: `ai_${now}_${i}`,
-      order: i + 1,
-      scaleLabels: q.scaleLabels ?? ['전혀 그렇지 않다', '그렇지 않다', '그렇다', '매우 그렇다'],
-    }))
+
+    // AI 생성 문항 정규화 (타입별로 필요없는 필드 제거)
+    const aiNormalized = questions.map((q: Record<string, unknown>, i: number) => {
+      const type = (q.type as string) || 'scale'
+      const base = {
+        ...q,
+        key: `ai_${now}_${i}`,
+        order: i + 1,
+        type,
+        isKillSignal: q.isKillSignal ?? false,
+      }
+      if (type === 'scale') {
+        return {
+          ...base,
+          scale: (q.scale as number) ?? 4,
+          scaleLabels: (q.scaleLabels as string[]) ?? ['전혀 그렇지 않다', '그렇지 않다', '그렇다', '매우 그렇다'],
+        }
+      }
+      if (type === 'choice') {
+        // scale/scaleLabels 제거
+        const { scale: _s, scaleLabels: _sl, ...rest } = base as Record<string, unknown>
+        void _s; void _sl
+        return { ...rest, choices: (q.choices as string[]) ?? ['예', '아니오'] }
+      }
+      // text: scale/scaleLabels 제거
+      const { scale: _s, scaleLabels: _sl, ...rest } = base as Record<string, unknown>
+      void _s; void _sl
+      return rest
+    })
+
+    // 고정 주관식 2개 — AI가 이미 포함했으면 중복 추가 방지
+    const existingLabels = new Set(aiNormalized.map((q: Record<string, unknown>) => String(q.label).trim()))
+    const fixedQuestions = FIXED_TEXT_QUESTIONS
+      .filter(fq => !existingLabels.has(fq.label.trim()))
+      .map((fq, i) => ({
+        key: `ai_fixed_${now}_${i}`,
+        label: fq.label,
+        type: 'text' as const,
+        isKillSignal: false,
+        group: fq.group,
+        order: aiNormalized.length + i + 1,
+      }))
+
+    const normalized = [
+      ...aiNormalized,
+      ...fixedQuestions,
+    ].map((q, i) => ({ ...q, order: i + 1 }))
 
     return NextResponse.json({ questions: normalized, truncated })
   } catch (e) {
     console.error('[ai-generate] error:', e)
 
-    // 항상 실제 에러 메시지를 포함해 반환
     let message = 'AI 문항 생성에 실패했습니다.'
-
     if (e instanceof Anthropic.APIError) {
-      if (e.status === 401) message = 'API 키가 올바르지 않습니다. Vercel 환경변수 ANTHROPIC_API_KEY를 확인해주세요.'
+      if (e.status === 401) message = 'API 키가 올바르지 않습니다.'
       else if (e.status === 404) message = `모델을 찾을 수 없습니다: ${e.message}`
       else if (e.status === 429) message = 'API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.'
       else message = `Anthropic API 오류 (${e.status}): ${e.message}`
