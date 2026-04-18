@@ -183,33 +183,33 @@
         "price": "무료",
         "unit": "영구",
         "panel": "내부 패널 무제한",
-        "analysis": "전체 분석 무료",
-        "output": "신호등 · CI · 코호트 · 드라이버",
+        "analysis": "전체 분석 포함",
+        "fee": "없음",
         "target": "모든 브랜드",
+        "cta": "무료로 시작하기",
         "recommended": false
       },
       {
         "name": "외부 패널",
         "price": "13,300원",
         "unit": "/ 인",
-        "panel": "나들목 외부 패널 DB",
-        "analysis": "전체 분석 무료",
-        "output": "신호등 · CI · 코호트 · 드라이버",
+        "panel": "나들목 패널 DB 이용",
+        "analysis": "전체 분석 포함",
+        "fee": "50,000원 / 건",
         "target": "소비자 반응 검증",
+        "cta": "무료로 시작하기",
         "recommended": true
-      },
-      {
-        "name": "배송 소분",
-        "price": "1,000원",
-        "unit": "/ 인 추가",
-        "panel": "샘플 소분 · 패널 배송",
-        "analysis": "전체 분석 무료",
-        "output": "신호등 · CI · 코호트 · 드라이버",
-        "target": "샘플 발송 대행 원하는 브랜드",
-        "recommended": false
       }
     ],
-    "pilot": "외부 패널 이용 시 운영대행료 50,000원/건 별도 · Basic(내부 패널)은 완전 무료"
+    "addonTitle": "부가 옵션",
+    "addons": [
+      {
+        "name": "배송 소분 대행",
+        "price": "+1,000원 / 인",
+        "desc": "샘플을 나들목으로 보내면 소분 후 패널에게 직접 배송합니다"
+      }
+    ],
+    "pilot": "* 외부 패널 인당 비용: 참가비 10,000원 + 용기 300원 + 배송비 3,000원"
   },
   "whyUs": {
     "title": "왜 나들목인가?",

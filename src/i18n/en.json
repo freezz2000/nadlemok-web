@@ -164,40 +164,40 @@
     ]
   },
   "pricing": {
-    "title": "Service Plans",
+    "title": "Simple Pricing",
     "plans": [
       {
         "name": "Basic",
-        "price": "KRW 2M",
-        "unit": "/ test",
-        "panel": "50 panelists · 10 days",
-        "analysis": "3-step analysis",
-        "output": "Verdict summary report",
-        "target": "Startups · Indie brands",
+        "price": "Free",
+        "unit": "forever",
+        "panel": "Unlimited internal panels",
+        "analysis": "Full analysis included",
+        "fee": "None",
+        "target": "All brands",
+        "cta": "Start for free",
         "recommended": false
       },
       {
-        "name": "Standard",
-        "price": "KRW 3M",
-        "unit": "/ test",
-        "panel": "50 panelists · 10 days",
-        "analysis": "5-step analysis",
-        "output": "Summary + Detailed report",
-        "target": "SMB cosmetics brands",
+        "name": "External Panel",
+        "price": "KRW 13,300",
+        "unit": "/ person",
+        "panel": "Nadlemok panel DB",
+        "analysis": "Full analysis included",
+        "fee": "KRW 50,000 / project",
+        "target": "Consumer validation",
+        "cta": "Start for free",
         "recommended": true
-      },
-      {
-        "name": "Premium",
-        "price": "KRW 5M",
-        "unit": "/ test",
-        "panel": "100 panelists · 15 days",
-        "analysis": "9-step deep analysis",
-        "output": "Summary + Detail + Formulation",
-        "target": "Mid-size brands and above",
-        "recommended": false
       }
     ],
-    "pilot": "Pilot offer: Discounted Standard plan for the first 3 companies. Contact us for terms."
+    "addonTitle": "Add-on Option",
+    "addons": [
+      {
+        "name": "Sample Distribution",
+        "price": "+KRW 1,000 / person",
+        "desc": "Send samples to Nadlemok — we split and ship directly to each panelist"
+      }
+    ],
+    "pilot": "* External panel cost per person: participation KRW 10,000 + container KRW 300 + shipping KRW 3,000"
   },
   "whyUs": {
     "title": "Why Nadlemok?",
