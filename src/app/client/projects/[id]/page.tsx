@@ -427,7 +427,7 @@ export default function ClientProjectDetailPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".pdf,.docx,.doc,.txt"
+                    accept=".pdf,.docx,.doc,.xlsx,.xls,.txt"
                     onChange={handleFileUpload}
                     className="hidden"
                     id="dev-request-file"
@@ -461,7 +461,7 @@ export default function ClientProjectDetailPage() {
                         {devRequestFilename}
                       </span>
                     ) : (
-                      <span className="text-xs text-text-muted">PDF, DOCX, TXT 지원 · 최대 10MB</span>
+                      <span className="text-xs text-text-muted">PDF, DOCX, XLSX, TXT 지원 · 최대 10MB</span>
                     )}
                   </div>
                   {fileError && (

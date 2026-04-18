@@ -51,9 +51,22 @@ export async function POST(
       const mammoth = await import('mammoth')
       const result = await mammoth.extractRawText({ buffer })
       text = result.value
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      const XLSX = await import('xlsx')
+      const workbook = XLSX.read(buffer, { type: 'buffer' })
+      const lines: string[] = []
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName]
+        const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false })
+        if (csv.trim()) {
+          lines.push(`[시트: ${sheetName}]`)
+          lines.push(csv)
+        }
+      }
+      text = lines.join('\n')
     } else {
       return NextResponse.json(
-        { error: '지원하지 않는 파일 형식입니다. PDF, DOCX, TXT 파일을 업로드해주세요.' },
+        { error: '지원하지 않는 파일 형식입니다. PDF, DOCX, XLSX, TXT 파일을 업로드해주세요.' },
         { status: 400 }
       )
     }
