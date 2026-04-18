@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       : productInfo
 
     const message = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022', // Opus 대비 5배 빠름 — Vercel 10초 타임아웃 대응
+      model: 'claude-3-haiku-20240307', // 빠르고 범용적으로 사용 가능한 모델
       max_tokens: 4096,
       messages: [
         {
