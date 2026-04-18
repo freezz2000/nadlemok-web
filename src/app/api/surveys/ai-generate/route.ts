@@ -17,11 +17,30 @@ const FIXED_TEXT_QUESTIONS = [
   },
 ]
 
+function getAnthropicApiKey(): string | undefined {
+  // 1차: process.env에서 읽기 (Vercel 배포 환경)
+  const fromEnv = process.env['ANTHROPIC_API_KEY']
+  if (fromEnv) return fromEnv
+
+  // 2차: .env.local 직접 읽기 (로컬 dev — Claude Code 실행 환경이 process.env를 빈값으로 덮어쓸 수 있음)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path') as typeof import('path')
+    const content = fs.readFileSync(path.join(process.cwd(), '.env.local'), 'utf-8')
+    const match = content.match(/^ANTHROPIC_API_KEY=(.+)$/m)
+    return match?.[1]?.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env['ANTHROPIC_API_KEY']
+  const apiKey = getAnthropicApiKey()
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. Vercel 환경변수를 확인하고 재배포해주세요.' },
+      { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. .env.local(로컬) 또는 Vercel 환경변수(배포)를 확인하세요.' },
       { status: 500 }
     )
   }
