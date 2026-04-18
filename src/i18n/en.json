@@ -56,17 +56,35 @@
     ]
   },
   "process": {
-    "title": "How It Works",
-    "subtitle": "From request to report in 10 days. All you need to do is send your sample.",
-    "steps": [
-      { "title": "Panel Selection", "desc": "Select panels matching your product's target demographics." },
-      { "title": "Test Design", "desc": "Design blind HUT with 4-point forced choice scale." },
-      { "title": "Sample & HUT", "desc": "Distribute samples, 10-day real-environment evaluation." },
-      { "title": "AI Validation", "desc": "Auto-filter inconsistent responses by speed and pattern." },
-      { "title": "Statistical Analysis", "desc": "Kill Signal → CI → Pearson → Cohort → Penalty → Verdict" },
-      { "title": "Verdict Report", "desc": "Deliver Go / Conditional Go / No-Go 3-report package." }
-    ],
-    "prep": "Client preparation: 2kg bulk or 60 pre-filled bottles (color/scent finalized)"
+    "title": "Two Verification Tracks",
+    "subtitle": "Choose what fits your situation. Both tracks start free.",
+    "internal": {
+      "label": "Internal Panel",
+      "duration": "1–3 days",
+      "badge": "Fast Verification",
+      "color": "go",
+      "steps": [
+        { "title": "Create Project", "desc": "Enter product name & category — instant setup" },
+        { "title": "Set Up Survey", "desc": "Load a template or add questions manually" },
+        { "title": "Send KakaoTalk", "desc": "Enter phone numbers → invite links sent automatically" },
+        { "title": "Collect Responses", "desc": "Panelists click link and complete survey (1–2 days)" },
+        { "title": "View Results", "desc": "Go / No-Go verdict + full analysis report" }
+      ]
+    },
+    "external": {
+      "label": "External Panel",
+      "duration": "5 days",
+      "badge": "Consumer Validation",
+      "color": "navy",
+      "steps": [
+        { "title": "Create Project + Select Panels", "desc": "Set criteria and pick from Nadlemok's panel DB", "day": "" },
+        { "title": "Set Up Survey", "desc": "Load a template or add questions manually", "day": "" },
+        { "title": "Ship Samples", "desc": "Samples shipped to selected panelists", "day": "D+1–2" },
+        { "title": "Test Period", "desc": "Panelists use product and complete survey", "day": "D+3–5" },
+        { "title": "View Results", "desc": "Go / No-Go verdict + full analysis report", "day": "D+5" }
+      ]
+    },
+    "prep": "Internal: product + employee phone numbers / External: sample inventory"
   },
   "verdict": {
     "title": "3-Tier Launch Verdict",
