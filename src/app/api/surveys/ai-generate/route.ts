@@ -7,14 +7,22 @@ export const maxDuration = 60 // Vercel Pro 이상에서 60초 허용
 const MAX_INPUT_CHARS = 6000
 
 export async function POST(req: NextRequest) {
-  // API 키를 요청 시점에 읽어 client 생성 (모듈 레벨 초기화 시 env가 undefined일 수 있음)
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  // process.env 직접 접근 + SDK 자체 readEnv 둘 다 시도
+  const apiKey = process.env.ANTHROPIC_API_KEY ?? process.env['ANTHROPIC_API_KEY']
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다. Vercel 환경변수를 확인하고 재배포해주세요.' },
+      {
+        error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.',
+        debug: {
+          nodeEnv: process.env.NODE_ENV,
+          supabaseExists: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          anthropicKeyLength: (process.env.ANTHROPIC_API_KEY ?? '').length,
+        },
+      },
       { status: 500 }
     )
   }
+  // apiKey를 명시하지 않으면 SDK가 자체적으로 process.env.ANTHROPIC_API_KEY를 읽음
   const client = new Anthropic({ apiKey })
 
   try {
