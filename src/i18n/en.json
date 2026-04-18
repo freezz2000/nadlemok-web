@@ -183,30 +183,37 @@
   },
   "pricing": {
     "title": "Simple Pricing",
-    "plans": [
-      {
-        "name": "Basic",
-        "price": "Free",
-        "unit": "forever",
-        "panel": "Unlimited internal panels",
-        "analysis": "Full analysis included",
-        "fee": "None",
-        "target": "All brands",
-        "cta": "Start for free",
-        "recommended": false
-      },
-      {
-        "name": "External Panel",
-        "price": "KRW 13,300",
-        "unit": "/ person",
-        "panel": "Nadlemok panel DB",
-        "analysis": "Full analysis included",
-        "fee": "KRW 50,000 / project",
-        "target": "Consumer validation",
-        "cta": "Start for free",
-        "recommended": true
-      }
-    ],
+    "basic": {
+      "name": "Basic",
+      "price": "Free",
+      "unit": "forever",
+      "features": ["Unlimited internal panels", "Full analysis included", "KakaoTalk invitations", "No operation fee"],
+      "target": "Recommended for all brands",
+      "cta": "Start for free"
+    },
+    "credits": {
+      "title": "External Panel Credits",
+      "subtitle": "1 credit = 1 external panelist",
+      "packages": [
+        {
+          "credits": 30,
+          "price": "KRW 500,000",
+          "perCredit": "KRW 16,667 / person",
+          "label": "Small validation",
+          "recommended": false
+        },
+        {
+          "credits": 50,
+          "price": "KRW 800,000",
+          "perCredit": "KRW 16,000 / person",
+          "saving": "Save 4%",
+          "label": "Standard validation",
+          "recommended": true
+        }
+      ],
+      "operationFee": "Operation fee KRW 50,000 / project (separate)",
+      "costBreakdown": "Cost breakdown (per person): Panel reward KRW 9,091 · Container KRW 720 · Box KRW 170 · Shipping KRW 2,400 · Other KRW 100 (excl. VAT)"
+    },
     "addonTitle": "Add-on Option",
     "addons": [
       {
@@ -214,8 +221,7 @@
         "price": "+KRW 1,000 / person",
         "desc": "Send samples to Nadlemok — we split and ship directly to each panelist"
       }
-    ],
-    "pilot": "* External panel cost per person: participation KRW 10,000 + container KRW 300 + shipping KRW 3,000"
+    ]
   },
   "whyUs": {
     "title": "Why Nadlemok?",

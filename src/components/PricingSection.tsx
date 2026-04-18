@@ -5,13 +5,7 @@ import { useTranslation } from "@/i18n/useTranslation";
 
 export default function PricingSection() {
   const { t } = useTranslation();
-
-  const rows = [
-    { label: "패널",     key: "panel"    },
-    { label: "분석",     key: "analysis" },
-    { label: "운영대행료", key: "fee"    },
-    { label: "추천 대상", key: "target"  },
-  ] as const;
+  const { basic, credits, addonTitle, addons } = t.pricing;
 
   return (
     <section id="pricing" className="py-24 bg-surface">
@@ -20,73 +14,105 @@ export default function PricingSection() {
           {t.pricing.title}
         </h2>
 
-        {/* ── 플랜 카드 2개 ── */}
-        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mb-6">
-          {t.pricing.plans.map((plan, i) => (
-            <div
-              key={i}
-              className={`relative rounded-xl p-8 border transition-all ${
-                plan.recommended
-                  ? "bg-navy text-white border-navy ring-2 ring-gold"
-                  : "bg-white text-text border-border"
-              }`}
-            >
-              {plan.recommended && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gold text-navy text-xs font-bold rounded-full whitespace-nowrap">
-                  ★ 소비자 검증 추천
-                </span>
-              )}
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
 
-              {/* 플랜명 + 가격 */}
-              <div className="text-center mb-6">
-                <h3 className={`text-lg font-bold mb-2 ${plan.recommended ? "text-white" : "text-navy"}`}>
-                  {plan.name}
-                </h3>
-                <div className={`text-3xl font-bold ${plan.recommended ? "text-gold" : "text-navy"}`}>
-                  {plan.price}
-                  <span className={`text-sm font-normal ml-1 ${plan.recommended ? "text-white/60" : "text-text-muted"}`}>
-                    {plan.unit}
-                  </span>
-                </div>
+          {/* ── Basic 카드 ── */}
+          <div className="rounded-xl border border-border bg-white p-8 flex flex-col">
+            <div className="mb-6">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1">내부 패널</p>
+              <h3 className="text-xl font-bold text-navy">{basic.name}</h3>
+              <div className="mt-3">
+                <span className="text-4xl font-black text-navy">{basic.price}</span>
+                <span className="text-sm text-text-muted ml-2">{basic.unit}</span>
               </div>
-
-              {/* 항목 리스트 */}
-              <div className="space-y-3 mb-6">
-                {rows.map(({ label, key }) => (
-                  <div key={key} className="flex justify-between items-start text-sm gap-4">
-                    <span className={`flex-shrink-0 ${plan.recommended ? "text-white/60" : "text-text-muted"}`}>
-                      {label}
-                    </span>
-                    <span className={`font-medium text-right ${plan.recommended ? "text-white" : "text-navy"}`}>
-                      {plan[key]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* CTA 버튼 */}
-              <Link
-                href="/register"
-                className={`block text-center py-3 rounded-lg text-sm font-medium transition-colors ${
-                  plan.recommended
-                    ? "bg-gold text-navy hover:bg-yellow-300"
-                    : "bg-navy/5 text-navy hover:bg-navy/10"
-                }`}
-              >
-                {plan.cta}
-              </Link>
             </div>
-          ))}
+
+            <ul className="space-y-2.5 mb-6 flex-1">
+              {basic.features.map((f: string, i: number) => (
+                <li key={i} className="flex items-center gap-2.5 text-sm text-text">
+                  <svg className="w-4 h-4 text-go flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-xs text-text-muted mb-4">{basic.target}</p>
+            <Link
+              href="/register"
+              className="block text-center py-3 rounded-lg text-sm font-medium bg-navy/5 text-navy hover:bg-navy/10 transition-colors"
+            >
+              {basic.cta}
+            </Link>
+          </div>
+
+          {/* ── 외부 패널 크레딧 카드 ── */}
+          <div className="rounded-xl border-2 border-navy bg-navy p-8 flex flex-col">
+            <div className="mb-6">
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-1">외부 패널</p>
+              <h3 className="text-xl font-bold text-white">{credits.title}</h3>
+              <p className="text-sm text-white/60 mt-1">{credits.subtitle}</p>
+            </div>
+
+            {/* 크레딧 패키지 2종 */}
+            <div className="space-y-3 mb-5 flex-1">
+              {credits.packages.map((pkg: {
+                credits: number; price: string; perCredit: string;
+                label: string; saving?: string; recommended: boolean;
+              }, i: number) => (
+                <div
+                  key={i}
+                  className={`rounded-xl p-4 border transition-all ${
+                    pkg.recommended
+                      ? "bg-gold/20 border-gold/50"
+                      : "bg-white/10 border-white/20"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-black text-white">{pkg.credits}크레딧</span>
+                        {pkg.recommended && (
+                          <span className="text-xs px-2 py-0.5 bg-gold text-navy font-bold rounded-full">추천</span>
+                        )}
+                        {pkg.saving && (
+                          <span className="text-xs px-2 py-0.5 bg-white/20 text-white rounded-full">{pkg.saving}</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/50 mt-0.5">{pkg.label}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-xl font-black ${pkg.recommended ? "text-gold" : "text-white"}`}>
+                        {pkg.price}
+                      </p>
+                      <p className="text-xs text-white/50">{pkg.perCredit}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 운영대행료 안내 */}
+            <p className="text-xs text-white/50 mb-4">{credits.operationFee}</p>
+
+            <Link
+              href="/register"
+              className="block text-center py-3 rounded-lg text-sm font-medium bg-gold text-navy hover:bg-yellow-300 transition-colors font-semibold"
+            >
+              무료로 시작하기
+            </Link>
+          </div>
         </div>
 
         {/* ── 부가 옵션 ── */}
-        <div className="max-w-3xl mx-auto mb-8">
+        <div className="max-w-4xl mx-auto mb-6">
           <div className="rounded-xl border border-border bg-white px-6 py-4">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-3">
-              {t.pricing.addonTitle}
+              {addonTitle}
             </p>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              {t.pricing.addons.map((addon, i) => (
+              {addons.map((addon: { name: string; price: string; desc: string }, i: number) => (
                 <div key={i} className="flex items-center gap-4 flex-1">
                   <span className="w-7 h-7 rounded-full bg-navy/5 flex items-center justify-center flex-shrink-0">
                     <svg className="w-3.5 h-3.5 text-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -104,10 +130,11 @@ export default function PricingSection() {
           </div>
         </div>
 
-        {/* ── 하단 주석 ── */}
-        <p className="text-center text-sm text-text-muted max-w-2xl mx-auto">
-          {t.pricing.pilot}
+        {/* ── 원가 투명 공개 ── */}
+        <p className="text-center text-xs text-text-muted max-w-2xl mx-auto">
+          {credits.costBreakdown}
         </p>
+
       </div>
     </section>
   );

@@ -186,7 +186,7 @@
     "title": "양산 버튼을 누르기 전에, 이 계산을 해보셨습니까?",
     "subtitle": "신제품 1건의 양산 비용 시나리오",
     "production": "평균 원가 3,000원 × 초도 10,000개 = 양산비만 3,000만원",
-    "nadlemok": "Basic 무료 · 외부 패널 이용 시 13,300원/인~",
+    "nadlemok": "Basic 무료 · 외부 패널 크레딧 500,000원~",
     "scenarios": [
       { "verdict": "No-Go", "desc": "양산 전 중단 → 매몰비용 전액 방어", "savings": "3,000만원+ 방어" },
       { "verdict": "Conditional Go", "desc": "제형 개선 가이드 → 보완 후 성공 출시", "savings": "리스크 최소화" },
@@ -195,30 +195,37 @@
   },
   "pricing": {
     "title": "투명한 요금제",
-    "plans": [
-      {
-        "name": "Basic",
-        "price": "무료",
-        "unit": "영구",
-        "panel": "내부 패널 무제한",
-        "analysis": "전체 분석 포함",
-        "fee": "없음",
-        "target": "모든 브랜드",
-        "cta": "무료로 시작하기",
-        "recommended": false
-      },
-      {
-        "name": "외부 패널",
-        "price": "13,300원",
-        "unit": "/ 인",
-        "panel": "나들목 패널 DB 이용",
-        "analysis": "전체 분석 포함",
-        "fee": "50,000원 / 건",
-        "target": "소비자 반응 검증",
-        "cta": "무료로 시작하기",
-        "recommended": true
-      }
-    ],
+    "basic": {
+      "name": "Basic",
+      "price": "무료",
+      "unit": "영구 무료",
+      "features": ["내부 패널 무제한", "전체 분석 포함", "카카오 알림톡 발송", "운영대행료 없음"],
+      "target": "모든 브랜드에 추천",
+      "cta": "무료로 시작하기"
+    },
+    "credits": {
+      "title": "외부 패널 크레딧",
+      "subtitle": "1크레딧 = 외부 패널 1인 검증",
+      "packages": [
+        {
+          "credits": 30,
+          "price": "500,000원",
+          "perCredit": "16,667원 / 인",
+          "label": "소규모 검증",
+          "recommended": false
+        },
+        {
+          "credits": 50,
+          "price": "800,000원",
+          "perCredit": "16,000원 / 인",
+          "saving": "4% 절약",
+          "label": "표준 검증",
+          "recommended": true
+        }
+      ],
+      "operationFee": "운영대행료 50,000원 / 건 별도",
+      "costBreakdown": "원가 구성 (인당): 패널 리워드 9,091원 · 용기 720원 · 박스 170원 · 택배 2,400원 · 기타 100원 (VAT 별도)"
+    },
     "addonTitle": "부가 옵션",
     "addons": [
       {
@@ -226,8 +233,7 @@
         "price": "+1,000원 / 인",
         "desc": "샘플을 나들목으로 보내면 소분 후 패널에게 직접 배송합니다"
       }
-    ],
-    "pilot": "* 외부 패널 인당 비용: 참가비 10,000원 + 용기 300원 + 배송비 3,000원"
+    ]
   },
   "whyUs": {
     "title": "왜 나들목인가?",
