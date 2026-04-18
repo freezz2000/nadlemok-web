@@ -57,7 +57,7 @@ export default function ClientProjectDetailPage() {
     if (surveys?.length) {
       const survey = surveys[0]
       setExistingSurveyId(survey.id)
-      setQuestions((survey.questions || []).map((q: SurveyQuestion) => ({ type: 'scale' as const, ...q })))
+      setQuestions((survey.questions || []).map((q: SurveyQuestion) => ({ ...q, type: (q.type || 'scale') as SurveyQuestion['type'] })))
       // 연결된 템플릿 ID 복원
       if (survey.template_id) setSelectedTemplateId(survey.template_id)
 
@@ -76,7 +76,7 @@ export default function ClientProjectDetailPage() {
     if (tmpl) {
       setSelectedTemplateId(templateId)
       // type이 없는 구형 템플릿 문항은 기본값 'scale'로 정규화
-      setQuestions(tmpl.questions.map((q) => ({ type: 'scale' as const, ...q })))
+      setQuestions(tmpl.questions.map((q) => ({ ...q, type: (q.type || 'scale') as SurveyQuestion['type'] })))
     }
   }
 
