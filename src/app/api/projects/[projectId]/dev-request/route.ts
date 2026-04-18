@@ -42,9 +42,8 @@ export async function POST(
     if (ext === 'txt') {
       text = buffer.toString('utf-8')
     } else if (ext === 'pdf') {
-      // pdf-parse: use lib path to avoid Next.js test-file loading issue
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse/lib/pdf-parse')
+      const pdfParse = require('pdf-parse')
       const result = await pdfParse(buffer)
       text = result.text
     } else if (ext === 'docx' || ext === 'doc') {
