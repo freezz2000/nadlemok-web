@@ -33,12 +33,12 @@ export async function GET(req: NextRequest) {
 // POST: 초대 수락 (패널 연결)
 export async function POST(req: NextRequest) {
   try {
-    const { token, panelId } = await req.json() as { token: string; panelId: string }
+    const { token, panelId, clientId } = await req.json() as { token: string; panelId: string; clientId?: string }
     if (!token || !panelId) return NextResponse.json({ error: '필수 파라미터 누락' }, { status: 400 })
 
     const { data: invitation } = await supabase
       .from('project_invitations')
-      .select('id, project_id, survey_id, status, expires_at, panel_id')
+      .select('id, project_id, survey_id, status, expires_at, panel_id, phone')
       .eq('token', token)
       .single()
 
@@ -64,6 +64,27 @@ export async function POST(req: NextRequest) {
       await supabase
         .from('survey_panels')
         .upsert({ survey_id: invitation.survey_id, panel_id: panelId, status: 'matched' }, { onConflict: 'survey_id,panel_id' })
+    }
+
+    // 고객사 패널 풀에 추가 (이미 있으면 무시)
+    // clientId: URL 파라미터로 받은 값 우선, 없으면 project 조회로 보완
+    let resolvedClientId = clientId
+    if (!resolvedClientId) {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('client_id')
+        .eq('id', invitation.project_id)
+        .single()
+      resolvedClientId = project?.client_id
+    }
+
+    if (resolvedClientId) {
+      await supabase
+        .from('client_panels')
+        .upsert(
+          { client_id: resolvedClientId, panel_id: panelId, phone: invitation.phone },
+          { onConflict: 'client_id,panel_id', ignoreDuplicates: true }
+        )
     }
 
     return NextResponse.json({ surveyId: invitation.survey_id, projectId: invitation.project_id })

@@ -84,8 +84,8 @@ export async function POST(req: NextRequest) {
         token = invite.token
       }
 
-      // 알림톡 발송
-      const inviteUrl = `${appUrl}/invite/${token}`
+      // 알림톡 발송 — token + client_id 포함한 초대 링크
+      const inviteUrl = `${appUrl}/invite/${token}?client=${project.client_id}`
       const { ok, message } = await sendInvite(trimmed, project.product_name, inviteUrl)
 
       results.push({ phone: trimmed, status: ok ? 'sent' : 'alimtalk_failed', message })

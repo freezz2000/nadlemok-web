@@ -177,7 +177,7 @@ export default function ClientProjectDetailPage() {
     setSaving(false)
   }
 
-  async function goToPanelSetup() {
+  async function advanceSurvey() {
     if (!project || questions.length === 0) return
     setConfirming(true)
 
@@ -189,17 +189,32 @@ export default function ClientProjectDetailPage() {
         status: 'draft',
       }).eq('id', existingSurveyId)
     } else {
-      await supabase.from('surveys').insert({
+      const { data: newSurvey } = await supabase.from('surveys').insert({
         project_id: id,
         template_id: selectedTemplateId || null,
         title: `${project.product_name} 설문`,
         questions,
         day_checkpoint: [1],
         status: 'draft',
-      })
+      }).select().single()
+      if (newSurvey) setExistingSurveyId(newSurvey.id)
+    }
+
+    // 프로젝트 상태 전진 (내부: testing / 외부: matching)
+    const res = await fetch('/api/projects/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId: id }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      // 상태 갱신
+      const { data: updated } = await supabase.from('projects').select('*').eq('id', id).single()
+      if (updated) setProject(updated)
+    } else {
+      alert(data.error || '오류가 발생했습니다. 다시 시도해주세요.')
     }
     setConfirming(false)
-    window.location.href = `/client/projects/${id}/panel-setup`
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -274,25 +289,56 @@ export default function ClientProjectDetailPage() {
 
   if (!project) return <p className="text-text-muted p-6">로딩중...</p>
 
+  const isPending = project.status === 'pending'
   const isDraft = project.status === 'draft'
   const isRejected = project.status === 'rejected'
-  const isMatching = project.status === 'matching'
+  const isMatching = project.status === 'matching' || project.status === 'recruiting'
   const isTesting = project.status === 'testing'
+  const isAnalyzing = project.status === 'analyzing'
+  const isCompleted = project.status === 'completed'
+  const isInternal = project.panel_source === 'internal'
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
 
-  const stages = [
-    { key: 'draft', label: '설문 설정', desc: '코호트를 선택하고 설문 문항을 설정해주세요' },
-    { key: 'matching', label: '패널 매칭', desc: '외부 패널을 선택하고 매칭을 완료해주세요' },
-    { key: 'testing', label: '테스트 진행', desc: '패널을 초대하고 테스트를 진행하세요' },
-    { key: 'analyzing', label: '분석 중', desc: '수집된 데이터를 분석 중입니다' },
-    { key: 'completed', label: '완료', desc: '분석이 완료되어 리포트를 확인할 수 있습니다' },
-  ]
-  // legacy statuses (pending, confirmed, approved, recruiting) → draft로 표시
-  const statusToStage: Record<string, string> = {
-    pending: 'draft', confirmed: 'draft', approved: 'draft', recruiting: 'testing',
-  }
-  const effectiveStatus = statusToStage[project.status] || project.status
-  const currentIdx = stages.findIndex((s) => s.key === effectiveStatus)
+  // 내부 패널: 패널 모집 단계 없음 (6단계)
+  // 외부 패널: 패널 모집 포함 (7단계)
+  const stages = isInternal
+    ? [
+        { label: '패널 설정',   desc: '패널 유형과 규모를 설정해주세요' },
+        { label: '설문 설정',   desc: '설문 문항을 설정하고 완료해주세요' },
+        { label: '테스트 진행', desc: '패널에게 초대 링크를 보내고 테스트를 시작하세요' },
+        { label: '테스트 종료', desc: '테스트가 완료되었습니다' },
+        { label: '분석',        desc: '수집된 데이터를 분석 중입니다' },
+        { label: '리포트 제공', desc: '분석이 완료되어 리포트를 확인할 수 있습니다' },
+      ]
+    : [
+        { label: '패널 설정',   desc: '패널 유형과 규모를 설정해주세요' },
+        { label: '설문 설정',   desc: '설문 문항을 설정하고 완료해주세요' },
+        { label: '패널 모집',   desc: '외부 패널을 모집하는 중입니다' },
+        { label: '테스트 진행', desc: '패널들이 제품을 테스트하는 중입니다' },
+        { label: '테스트 종료', desc: '테스트가 완료되었습니다' },
+        { label: '분석',        desc: '수집된 데이터를 분석 중입니다' },
+        { label: '리포트 제공', desc: '분석이 완료되어 리포트를 확인할 수 있습니다' },
+      ]
+
+  const statusToIndex: Record<string, number> = isInternal
+    ? {
+        pending: 0,
+        draft: 1,
+        confirmed: 1, approved: 1,
+        testing: 2,
+        analyzing: 4,
+        completed: 5,
+      }
+    : {
+        pending: 0,
+        draft: 1,
+        confirmed: 1, approved: 1,
+        matching: 2,  recruiting: 2,
+        testing: 3,
+        analyzing: 5,
+        completed: 6,
+      }
+  const currentIdx = statusToIndex[project.status] ?? 0
 
   const groupBadgeVariant = (color: string) => {
     const map: Record<string, 'nogo' | 'info' | 'go' | 'warning' | 'default'> = {
@@ -316,16 +362,18 @@ export default function ClientProjectDetailPage() {
       {/* 진행 단계 */}
       <Card className="mb-6">
         <CardTitle>진행 현황</CardTitle>
-        <div className="mt-4 flex items-center">
+        <div className="mt-4 flex items-center overflow-x-auto pb-1">
           {stages.map((stage, i) => (
-            <div key={stage.key} className="flex-1 flex items-center">
-              <div className="flex flex-col items-center text-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  i <= currentIdx ? 'bg-navy text-white' : 'bg-surface-dark text-text-muted'
+            <div key={stage.label} className="flex-1 flex items-center min-w-0">
+              <div className="flex flex-col items-center text-center min-w-[52px]">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+                  i < currentIdx ? 'bg-navy text-white' :
+                  i === currentIdx ? 'bg-navy text-white ring-2 ring-navy/30 ring-offset-1' :
+                  'bg-surface-dark text-text-muted'
                 }`}>
                   {i < currentIdx ? '✓' : i + 1}
                 </div>
-                <span className={`text-xs mt-1 ${i <= currentIdx ? 'text-navy font-medium' : 'text-text-muted'}`}>
+                <span className={`text-xs mt-1 leading-tight ${i <= currentIdx ? 'text-navy font-medium' : 'text-text-muted'}`}>
                   {stage.label}
                 </span>
               </div>
@@ -343,20 +391,29 @@ export default function ClientProjectDetailPage() {
         {!isRejected && (
           <p className="text-sm text-text-muted mt-4 text-center">{stages[currentIdx]?.desc}</p>
         )}
-        {isMatching && (
+
+        {/* 단계별 액션 버튼 */}
+        {isPending && (
           <div className="mt-4 flex justify-center">
             <Link
-              href={`/client/projects/${id}/panel-match`}
+              href={`/client/projects/${id}/panel-setup`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              외부 패널 선택하기
+              패널 설정하기
             </Link>
           </div>
         )}
-        {isTesting && (
+        {isMatching && !isInternal && (
+          <div className="mt-4 flex justify-center">
+            <div className="text-center">
+              <p className="text-xs text-text-muted mb-2">관리자가 외부 패널을 배정 중입니다. 잠시만 기다려주세요.</p>
+            </div>
+          </div>
+        )}
+        {isTesting && isInternal && (
           <div className="mt-4 flex justify-center">
             <Link
               href={`/client/projects/${id}/invite`}
@@ -366,6 +423,29 @@ export default function ClientProjectDetailPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
               패널 초대하기
+            </Link>
+          </div>
+        )}
+        {isTesting && !isInternal && (
+          <div className="mt-4 text-center">
+            <p className="text-xs text-text-muted">배정된 외부 패널이 테스트를 진행하고 있습니다.</p>
+          </div>
+        )}
+        {isAnalyzing && (
+          <div className="mt-4 flex justify-center">
+            <p className="text-xs text-text-muted">AI가 응답 데이터를 분석하고 있습니다. 완료 시 알림을 드립니다.</p>
+          </div>
+        )}
+        {isCompleted && (
+          <div className="mt-4 flex justify-center">
+            <Link
+              href={`/client/projects/${id}/results`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-go text-white text-sm font-medium rounded-lg hover:bg-go/90 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              리포트 확인하기
             </Link>
           </div>
         )}
@@ -590,8 +670,8 @@ export default function ClientProjectDetailPage() {
               <Button variant="secondary" onClick={saveDraft} loading={saving} disabled={questions.length === 0}>
                 임시 저장
               </Button>
-              <Button onClick={goToPanelSetup} loading={confirming} disabled={questions.length === 0}>
-                다음 — 패널 설정하기
+              <Button onClick={advanceSurvey} loading={confirming} disabled={questions.length === 0}>
+                {isInternal ? '설문 완료 — 테스트 시작' : '설문 완료 — 패널 모집 시작'}
               </Button>
               {questions.length === 0 && (
                 <span className="text-xs text-text-muted">문항이 있어야 확정할 수 있습니다</span>
@@ -666,14 +746,6 @@ export default function ClientProjectDetailPage() {
         </Card>
       )}
 
-      {project.status === 'completed' && (
-        <Link
-          href={`/client/projects/${id}/results`}
-          className="block w-full text-center py-3 bg-navy text-white rounded-lg font-medium hover:bg-navy-dark transition-colors"
-        >
-          분석 결과 확인하기
-        </Link>
-      )}
     </div>
   )
 }

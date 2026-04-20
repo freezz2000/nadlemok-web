@@ -127,8 +127,9 @@ ${category ? `카테고리: ${category}` : ''}
 
 다음 규칙을 반드시 따라주세요:
 1. Kill Signal 문항 2~3개: 자극감·끈적임·이물감·냄새 이상 등 치명적 불만 감지용 — type: "scale" (4점 척도)
-2. 일반 평가 문항 7~10개: 제형감·흡수력·발림성·보습감·향·전반적 만족도 등 — type: "scale" (4점 척도)
-3. 추천 의향 1개, 구매 의향 1개 — type: "scale" (4점 척도)
+2. 사용감(usage) 문항 3~4개: 제형감·발림성·흡수력·텍스처·도포감 등 — type: "scale" (4점 척도)
+3. 기능성(function) 문항 3~4개: 보습력·수분감·미백·주름개선·탄력 등 효능 — type: "scale" (4점 척도)
+4. 종합평가(overall) 문항 2~3개: 전반적 만족도·구매의향·추천의향 — type: "scale" (4점 척도)
 
 문항 type 규칙:
 - "scale": 4점 척도 문항 (scale=4, scaleLabels 필수)
@@ -145,13 +146,19 @@ ${category ? `카테고리: ${category}` : ''}
     "scale": 4,
     "scaleLabels": ["전혀 그렇지 않다", "그렇지 않다", "그렇다", "매우 그렇다"],
     "isKillSignal": false,
-    "group": "texture",
+    "group": "usage",
     "order": 1
   }
 ]
 
-group 값: "killsignal" | "texture" | "absorption" | "scent" | "moisture" | "overall" | "purchase"
-isKillSignal: Kill Signal 문항만 true, 나머지 false
+group 값은 아래 5가지만 사용하세요 (그 외 값은 절대 사용 금지):
+- "killsignal" : Kill Signal 문항 (isKillSignal: true 필수) — 자극감, 끈적임, 이물감, 냄새 이상 등
+- "usage"      : 사용감 — 제형감, 발림성, 흡수력, 텍스처, 도포감, 밀착감 등
+- "function"   : 기능성 — 보습력, 수분감, 미백효과, 주름개선, 탄력, 피부결 등 효능·효과
+- "claim_risk" : Claim Risk — 광고 문구·마케팅 주장 검증 (예: "24시간 지속", "피부 장벽 강화" 등)
+- "overall"    : 종합평가 — 전반적 만족도, 구매의향, 추천의향, 재구매의향, 가성비
+
+isKillSignal: Kill Signal 문항(group="killsignal")만 true, 나머지는 반드시 false
 type이 "text"인 경우 scale·scaleLabels 필드 생략
 type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
         },
@@ -192,15 +199,40 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
 
     const now = Date.now()
 
+    // 유효한 group 값 목록
+    const VALID_GROUPS = new Set(['killsignal', 'usage', 'function', 'claim_risk', 'verification', 'overall'])
+
+    // AI가 잘못된 group을 반환할 경우 가장 가까운 유효 그룹으로 매핑
+    const GROUP_ALIAS: Record<string, string> = {
+      // 사용감 계열
+      texture: 'usage', spreadability: 'usage', absorption: 'usage', spreadability2: 'usage',
+      feel: 'usage', application: 'usage', texture_feel: 'usage',
+      // 기능성 계열
+      scent: 'function', moisture: 'function', whitening: 'function', wrinkle: 'function',
+      hydration: 'function', elasticity: 'function', brightening: 'function',
+      efficacy: 'function', effect: 'function',
+      // 종합 계열
+      purchase: 'overall', recommend: 'overall', satisfaction: 'overall',
+      repurchase: 'overall', value: 'overall',
+    }
+
+    function sanitizeGroup(raw: unknown): string {
+      const g = String(raw ?? 'overall').toLowerCase().trim()
+      if (VALID_GROUPS.has(g)) return g
+      return GROUP_ALIAS[g] ?? 'overall'
+    }
+
     // AI 생성 문항 정규화 (타입별로 필요없는 필드 제거)
     const aiNormalized = questions.map((q: Record<string, unknown>, i: number) => {
       const type = (q.type as string) || 'scale'
+      const group = sanitizeGroup(q.group)
       const base = {
         ...q,
         key: `ai_${now}_${i}`,
         order: i + 1,
         type,
-        isKillSignal: q.isKillSignal ?? false,
+        group,
+        isKillSignal: group === 'killsignal' ? true : (q.isKillSignal ?? false),
       }
       if (type === 'scale') {
         return {

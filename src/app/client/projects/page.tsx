@@ -60,7 +60,7 @@ export default function ClientProjectsPage() {
                   <div>
                     <p className="font-medium text-text">{p.product_name}</p>
                     <p className="text-sm text-text-muted mt-1">
-                      {p.plan?.toUpperCase()} / 패널 {p.panel_size}명 / {p.test_duration}일
+                      {p.panel_source === 'internal' ? '내부 패널' : p.panel_source === 'external' ? '외부 패널' : p.panel_source === 'mixed' ? '내외부 혼합' : '패널 미설정'} / 패널 {p.panel_size}명 / {p.test_duration}일
                     </p>
                     <p className="text-xs text-text-muted mt-1">
                       신청일: {new Date(p.created_at).toLocaleDateString('ko')}

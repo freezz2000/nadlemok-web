@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/lib/types'
 
 interface NavItem {
@@ -25,6 +27,8 @@ const navItems: Record<UserRole, NavItem[]> = {
     { href: '/client', label: '대시보드', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
     { href: '/client/apply', label: '새 프로젝트', icon: 'M12 4v16m8-8H4' },
     { href: '/client/projects', label: '내 프로젝트', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+    { href: '/client/panels', label: '내 패널', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+    { href: '/client/subscription', label: '크레딧 충전', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
     { href: '/client/profile', label: '내 프로필', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   ],
   panel: [
@@ -48,6 +52,21 @@ interface SidebarProps {
 export default function Sidebar({ role, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
   const items = navItems[role]
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (role !== 'client') return
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('client_credits')
+        .select('balance')
+        .eq('client_id', user.id)
+        .single()
+        .then(({ data }) => setCreditBalance(data?.balance ?? 0))
+    })
+  }, [role])
 
   return (
     <aside className={`w-64 h-screen bg-navy text-white flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
@@ -94,6 +113,31 @@ export default function Sidebar({ role, isOpen = false, onClose }: SidebarProps)
           )
         })}
       </nav>
+
+      {/* 크레딧 잔액 (client 전용) */}
+      {role === 'client' && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/client/subscription"
+            onClick={onClose}
+            className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/10 hover:bg-white/15 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-gold flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <span className="text-xs text-white/70">크레딧 잔액</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-gold">
+                {creditBalance !== null ? creditBalance : '—'}
+              </span>
+              <span className="text-xs text-white/50">cr</span>
+              <span className="text-xs text-white/40 ml-0.5">충전 →</span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-white/10 text-xs text-white/40">

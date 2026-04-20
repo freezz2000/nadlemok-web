@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 
@@ -18,6 +18,8 @@ interface InvitationData {
 export default function InviteTokenPage() {
   const { token } = useParams<{ token: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const clientId = searchParams.get('client') ?? undefined
   const supabase = createClient()
 
   const [step, setStep] = useState<'loading' | 'info' | 'auth' | 'done' | 'error'>('loading')
@@ -66,7 +68,7 @@ export default function InviteTokenPage() {
     const res = await fetch('/api/invite/accept', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, panelId }),
+      body: JSON.stringify({ token, panelId, clientId }),
     })
     const data = await res.json()
 

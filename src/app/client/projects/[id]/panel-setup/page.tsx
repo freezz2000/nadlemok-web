@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Button from '@/components/ui/Button'
+import { createClient } from '@/lib/supabase/client'
 import {
   AGE_RANGE_OPTIONS,
   SKIN_TYPE_OPTIONS,
@@ -14,15 +16,35 @@ import {
 
 type PanelSource = 'internal' | 'external'
 
+const SUBSCRIPTION_PLANS = [
+  {
+    key: 'starter',
+    name: 'Starter',
+    priceLabel: '29,000원/월',
+    credits: 100,
+    desc: '외부 패널 30명 × 3회 검증 가능',
+  },
+  {
+    key: 'growth',
+    name: 'Growth',
+    priceLabel: '49,000원/월',
+    credits: 300,
+    desc: '외부 패널 50명 × 6회 검증 가능',
+    badge: '인기',
+  },
+]
+
 export default function PanelSetupPage() {
   const { id: projectId } = useParams<{ id: string }>()
   const router = useRouter()
+  const supabase = createClient()
 
   const [productName, setProductName] = useState('')
   const [plan, setPlan] = useState<string>('')
   const [panelSize, setPanelSize] = useState<number | null>(null)
   const [testDuration, setTestDuration] = useState<number | null>(null)
   const [selected, setSelected] = useState<PanelSource | null>(null)
+  const [panelSourceFixed, setPanelSourceFixed] = useState(false)
   const [externalCount, setExternalCount] = useState(30)
   const [deliveryService, setDeliveryService] = useState(false)
   const [ageRanges, setAgeRanges] = useState<string[]>([])
@@ -30,18 +52,62 @@ export default function PanelSetupPage() {
   const [skinConcerns, setSkinConcerns] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch(`/api/projects/${projectId}/info`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.product_name) setProductName(d.product_name)
-        if (d.plan) setPlan(d.plan)
-        if (d.panel_size != null) setPanelSize(d.panel_size)
-        if (d.test_duration != null) setTestDuration(d.test_duration)
-      })
-      .catch(() => {})
-  }, [projectId])
+    async function load() {
+      // 프로젝트 정보
+      const res = await fetch(`/api/projects/${projectId}/info`)
+      const d = await res.json()
+      if (d.product_name) setProductName(d.product_name)
+      if (d.plan) setPlan(d.plan)
+      if (d.panel_size != null) setPanelSize(d.panel_size)
+      if (d.test_duration != null) setTestDuration(d.test_duration)
+      if (d.panel_source) {
+        setSelected(d.panel_source as PanelSource)
+        setPanelSourceFixed(true)
+
+        // 내부 패널은 설정 없이 바로 설문 설정으로 이동
+        if (d.panel_source === 'internal') {
+          await fetch('/api/projects/panel-setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId,
+              panelSource: 'internal',
+              externalPanelCount: 0,
+              deliveryService: false,
+              ageRanges: [],
+              skinTypes: [],
+              skinConcerns: [],
+            }),
+          })
+          router.push(`/client/projects/${projectId}`)
+          return
+        }
+      }
+      if (d.external_panel_count) setExternalCount(d.external_panel_count)
+      if (d.ageRanges?.length) setAgeRanges(d.ageRanges)
+      if (d.skinTypes?.length) setSkinTypes(d.skinTypes)
+      if (d.skinConcerns?.length) setSkinConcerns(d.skinConcerns)
+
+      // 크레딧 잔액
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: cr } = await supabase
+          .from('client_credits')
+          .select('balance')
+          .eq('client_id', user.id)
+          .single()
+        setCreditBalance(cr?.balance ?? 0)
+      }
+    }
+    load().catch(() => {})
+  }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 크레딧 충분 여부
+  const creditsNeeded = selected === 'external' ? externalCount : 0
+  const hasEnoughCredits = creditBalance !== null && creditBalance >= creditsNeeded
 
   const quote = selected === 'external' ? calculateQuote(externalCount, deliveryService) : null
   const breakdown = selected === 'external' ? getQuoteBreakdown(externalCount, deliveryService) : null
@@ -72,12 +138,28 @@ export default function PanelSetupPage() {
     setSaving(false)
     if (!res.ok) { setError(data.error || '오류가 발생했습니다.'); return }
 
-    if (selected === 'external') {
-      router.push(`/client/projects/${projectId}/panel-match`)
-    } else {
-      router.push(`/client/projects/${projectId}`)
-    }
+    // 패널유형 설정 후 항상 설문설정 화면으로 이동
+    router.push(`/client/projects/${projectId}`)
   }
+
+  // 선택한 요금제 표시 정보 계산
+  const planLabel = selected === 'internal'
+    ? '내부 패널'
+    : selected === 'external'
+      ? `외부 패널 ${externalCount}명`
+      : plan ? plan.toUpperCase() : '—'
+
+  const priceLabel = selected === 'internal'
+    ? '무료'
+    : selected === 'external'
+      ? (externalCount >= 50 ? '800,000원' : '500,000원')
+      : '—'
+
+  const durationLabel = selected === 'internal'
+    ? '1~3일'
+    : selected === 'external'
+      ? '5~7일'
+      : testDuration != null ? `${testDuration}일` : '—'
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -86,9 +168,11 @@ export default function PanelSetupPage() {
         <div className="inline-flex items-center gap-2 bg-navy/5 text-navy text-xs font-semibold px-3 py-1.5 rounded-full mb-4">
           <span>프로젝트 생성 완료</span>
           <span className="text-navy/40">→</span>
-          <span className="text-navy">패널 선택</span>
+          <span className="text-navy">{panelSourceFixed ? '패널 설정' : '패널 선택'}</span>
         </div>
-        <h1 className="text-2xl font-bold text-text">어떤 방식으로 진행할까요?</h1>
+        <h1 className="text-2xl font-bold text-text">
+          {panelSourceFixed ? '패널 설정을 완료해주세요' : '어떤 방식으로 진행할까요?'}
+        </h1>
         {productName && (
           <p className="text-sm text-text-muted mt-1.5">{productName}</p>
         )}
@@ -97,16 +181,16 @@ export default function PanelSetupPage() {
       {/* 프로젝트 기본 정보 */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <div className="bg-white border border-border rounded-xl px-4 py-3">
-          <p className="text-xs text-text-muted">플랜</p>
-          <p className="text-lg font-bold text-navy mt-0.5">{plan ? plan.toUpperCase() : '—'}</p>
+          <p className="text-xs text-text-muted">패널 유형</p>
+          <p className="text-base font-bold text-navy mt-0.5 leading-tight">{planLabel}</p>
         </div>
         <div className="bg-white border border-border rounded-xl px-4 py-3">
-          <p className="text-xs text-text-muted">패널 규모</p>
-          <p className="text-lg font-bold text-text mt-0.5">{panelSize != null ? `${panelSize}명` : '—'}</p>
+          <p className="text-xs text-text-muted">비용</p>
+          <p className="text-base font-bold text-go mt-0.5">{priceLabel}</p>
         </div>
         <div className="bg-white border border-border rounded-xl px-4 py-3">
-          <p className="text-xs text-text-muted">테스트 기간</p>
-          <p className="text-lg font-bold text-text mt-0.5">{testDuration != null ? `${testDuration}일` : '—'}</p>
+          <p className="text-xs text-text-muted">완료까지</p>
+          <p className="text-base font-bold text-text mt-0.5">{durationLabel}</p>
         </div>
         <div className="bg-white border border-border rounded-xl px-4 py-3">
           <p className="text-xs text-text-muted">응답 진행</p>
@@ -114,114 +198,108 @@ export default function PanelSetupPage() {
         </div>
       </div>
 
-      {/* 선택 카드 2개 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        {/* 내부 패널 카드 */}
-        <button
-          type="button"
-          onClick={() => setSelected('internal')}
-          className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 ${
-            selected === 'internal'
-              ? 'border-go bg-go/5 shadow-sm'
-              : 'border-border hover:border-go/40 bg-white'
-          }`}
-        >
-          {selected === 'internal' && (
-            <span className="absolute top-4 right-4 w-5 h-5 bg-go rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-          )}
-          {/* 아이콘 */}
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 ${
-            selected === 'internal' ? 'bg-go/10' : 'bg-surface'
-          }`}>
-            👥
-          </div>
-
-          <div className="mb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-base font-bold text-text">내부 패널</h2>
-              <span className="text-xs font-semibold text-go bg-go/10 px-2 py-0.5 rounded-full">무료</span>
+      {/* 선택 카드 2개 — apply 페이지에서 이미 선택한 경우 숨김 */}
+      {!panelSourceFixed && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {/* 내부 패널 카드 */}
+          <button
+            type="button"
+            onClick={() => setSelected('internal')}
+            className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 ${
+              selected === 'internal'
+                ? 'border-go bg-go/5 shadow-sm'
+                : 'border-border hover:border-go/40 bg-white'
+            }`}
+          >
+            {selected === 'internal' && (
+              <span className="absolute top-4 right-4 w-5 h-5 bg-go rounded-full flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+            )}
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 ${
+              selected === 'internal' ? 'bg-go/10' : 'bg-surface'
+            }`}>
+              👥
             </div>
-            <p className="text-xs text-text-muted">직원·팀원·지인을 초대해서 빠르게 검증</p>
-          </div>
-
-          <ul className="space-y-2">
-            {[
-              { icon: '⚡', text: '1~3일 이내 완료' },
-              { icon: '📱', text: '카카오 링크로 간편 초대' },
-              { icon: '📊', text: '자동 분석 리포트 제공' },
-            ].map((item, i) => (
-              <li key={i} className="flex items-center gap-2 text-xs text-text-muted">
-                <span>{item.icon}</span>
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className={`mt-4 pt-4 border-t ${selected === 'internal' ? 'border-go/20' : 'border-border'}`}>
-            <p className="text-xs text-text-muted">
-              <span className="font-medium text-text">적합한 경우</span><br />
-              초기 내부 검증, 빠른 피드백 수집
-            </p>
-          </div>
-        </button>
-
-        {/* 외부 패널 카드 */}
-        <button
-          type="button"
-          onClick={() => setSelected('external')}
-          className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 ${
-            selected === 'external'
-              ? 'border-navy bg-navy/5 shadow-sm'
-              : 'border-border hover:border-navy/40 bg-white'
-          }`}
-        >
-          {selected === 'external' && (
-            <span className="absolute top-4 right-4 w-5 h-5 bg-navy rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-          )}
-          {/* 아이콘 */}
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 ${
-            selected === 'external' ? 'bg-navy/10' : 'bg-surface'
-          }`}>
-            🔍
-          </div>
-
-          <div className="mb-3">
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-base font-bold text-text">외부 패널</h2>
-              <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">유료</span>
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-base font-bold text-text">내부 패널</h2>
+                <span className="text-xs font-semibold text-go bg-go/10 px-2 py-0.5 rounded-full">무료</span>
+              </div>
+              <p className="text-xs text-text-muted">직원·팀원·지인을 초대해서 빠르게 검증</p>
             </div>
-            <p className="text-xs text-text-muted">나들목 전문 패널풀에서 실제 소비자 검증</p>
-          </div>
+            <ul className="space-y-2">
+              {[
+                { icon: '⚡', text: '1~3일 이내 완료' },
+                { icon: '📱', text: '카카오 링크로 간편 초대' },
+                { icon: '📊', text: '자동 분석 리포트 제공' },
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs text-text-muted">
+                  <span>{item.icon}</span>
+                  <span>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+            <div className={`mt-4 pt-4 border-t ${selected === 'internal' ? 'border-go/20' : 'border-border'}`}>
+              <p className="text-xs text-text-muted">
+                <span className="font-medium text-text">적합한 경우</span><br />
+                초기 내부 검증, 빠른 피드백 수집
+              </p>
+            </div>
+          </button>
 
-          <ul className="space-y-2">
-            {[
-              { icon: '👤', text: '실제 타겟 소비자 검증' },
-              { icon: '🚚', text: '배송 포함 약 5일 소요' },
-              { icon: '📈', text: '통계적으로 유의미한 분석' },
-            ].map((item, i) => (
-              <li key={i} className="flex items-center gap-2 text-xs text-text-muted">
-                <span>{item.icon}</span>
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className={`mt-4 pt-4 border-t ${selected === 'external' ? 'border-navy/20' : 'border-border'}`}>
-            <p className="text-xs text-text-muted">
-              <span className="font-medium text-text">적합한 경우</span><br />
-              출시 전 소비자 반응 검증, 정식 리포트 필요
-            </p>
-          </div>
-        </button>
-      </div>
+          {/* 외부 패널 카드 */}
+          <button
+            type="button"
+            onClick={() => setSelected('external')}
+            className={`relative text-left p-6 rounded-2xl border-2 transition-all duration-200 ${
+              selected === 'external'
+                ? 'border-navy bg-navy/5 shadow-sm'
+                : 'border-border hover:border-navy/40 bg-white'
+            }`}
+          >
+            {selected === 'external' && (
+              <span className="absolute top-4 right-4 w-5 h-5 bg-navy rounded-full flex items-center justify-center">
+                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+            )}
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4 ${
+              selected === 'external' ? 'bg-navy/10' : 'bg-surface'
+            }`}>
+              🔍
+            </div>
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-base font-bold text-text">외부 패널</h2>
+                <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">유료</span>
+              </div>
+              <p className="text-xs text-text-muted">나들목 전문 패널풀에서 실제 소비자 검증</p>
+            </div>
+            <ul className="space-y-2">
+              {[
+                { icon: '👤', text: '실제 타겟 소비자 검증' },
+                { icon: '🚚', text: '배송 포함 약 5일 소요' },
+                { icon: '📈', text: '통계적으로 유의미한 분석' },
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs text-text-muted">
+                  <span>{item.icon}</span>
+                  <span>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+            <div className={`mt-4 pt-4 border-t ${selected === 'external' ? 'border-navy/20' : 'border-border'}`}>
+              <p className="text-xs text-text-muted">
+                <span className="font-medium text-text">적합한 경우</span><br />
+                출시 전 소비자 반응 검증, 정식 리포트 필요
+              </p>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* 외부 패널 선택 시 — 상세 설정 */}
       {selected === 'external' && (
@@ -360,6 +438,57 @@ export default function PanelSetupPage() {
               <p className="text-xs text-text-muted mt-1.5">* VAT 별도</p>
             </div>
           )}
+
+          {/* 크레딧 잔액 확인 */}
+          <div className={`rounded-xl border p-4 ${hasEnoughCredits ? 'border-go/30 bg-go/5' : 'border-nogo/30 bg-nogo/5'}`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-semibold text-text">크레딧 잔액</span>
+              <span className={`text-xl font-black ${hasEnoughCredits ? 'text-go' : 'text-nogo'}`}>
+                {creditBalance ?? '—'} <span className="text-sm font-normal">cr</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>이번 검증에 필요한 크레딧</span>
+              <span className="font-semibold">{creditsNeeded} cr</span>
+            </div>
+            {!hasEnoughCredits && creditBalance !== null && (
+              <p className="text-xs text-nogo mt-1.5 font-medium">
+                {creditsNeeded - creditBalance}cr 부족합니다. 구독을 시작하면 크레딧이 즉시 충전됩니다.
+              </p>
+            )}
+          </div>
+
+          {/* 크레딧 부족 시 구독 플랜 카드 */}
+          {!hasEnoughCredits && creditBalance !== null && (
+            <div>
+              <p className="text-sm font-semibold text-text mb-3">구독 플랜 선택</p>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {SUBSCRIPTION_PLANS.map((p) => (
+                  <Link
+                    key={p.key}
+                    href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
+                    className="relative block text-left p-4 rounded-xl border-2 border-border bg-white hover:border-navy/40 transition-all"
+                  >
+                    {p.badge && (
+                      <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 bg-gold text-navy font-bold rounded-full">
+                        {p.badge}
+                      </span>
+                    )}
+                    <p className="font-bold text-text">{p.name}</p>
+                    <p className="text-navy font-semibold text-sm mt-0.5">{p.priceLabel}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{p.credits}cr/월</p>
+                    <p className="text-xs text-text-muted mt-2 leading-relaxed">{p.desc}</p>
+                  </Link>
+                ))}
+              </div>
+              <Link
+                href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
+                className="block w-full text-center py-3 rounded-xl bg-navy text-white font-semibold text-sm hover:bg-navy/90 transition-colors"
+              >
+                구독 시작하기 — 크레딧 즉시 충전
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
@@ -372,12 +501,12 @@ export default function PanelSetupPage() {
       <Button
         onClick={handleConfirm}
         loading={saving}
-        disabled={!selected}
+        disabled={!selected || (selected === 'external' && !hasEnoughCredits)}
         className="w-full"
         size="lg"
       >
         {selected === 'external'
-          ? '다음 — 패널 선택하기'
+          ? (hasEnoughCredits ? `다음 — 패널 선택하기 (${creditsNeeded}cr 사용)` : '크레딧이 부족합니다')
           : selected === 'internal'
             ? '시작하기 — 설문 설정으로'
             : '방식을 선택해주세요'}

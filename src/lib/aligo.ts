@@ -64,15 +64,31 @@ async function sendOne(
   }
   if (button) params.button_1 = button
 
-  const res = await fetch(ALIGO_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params).toString(),
-  })
+  try {
+    const body = Object.entries(params)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&')
 
-  const data = await res.json()
-  if (data.code === 0) return { ok: true }
-  return { ok: false, message: `${data.message} (code: ${data.code})` }
+    const res = await fetch(ALIGO_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    })
+
+    const text = await res.text()
+
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return { ok: false, message: `응답 파싱 실패 (HTTP ${res.status}): ${text.slice(0, 200)}` }
+    }
+
+    if (data.code === 0) return { ok: true }
+    return { ok: false, message: `[Aligo ${data.code}] ${data.message}` }
+  } catch (e) {
+    return { ok: false, message: `네트워크 오류: ${e instanceof Error ? e.message : String(e)}` }
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -80,31 +96,35 @@ async function sendOne(
 // ─────────────────────────────────────────────────────────
 
 /**
- * NDM_INVITE — 패널 초대
+ * UG_9429 — 패널 초대
  *
- * 알리고 등록 템플릿:
+ * 알리고 등록 템플릿 (실제 내용):
  * ┌─────────────────────────────────────────────────┐
  * │ [나들목] 제품 테스트 패널 초대                  │
  * │                                                 │
  * │ #{제품명} 테스트 패널로 초대드립니다.           │
  * │                                                 │
- * │ 아래 버튼을 클릭하거나 링크를 복사해            │
- * │ 참여해 주세요.                                  │
- * │ #{초대링크}                                     │
- * │                                                 │
+ * │ 아래 버튼을 클릭하여 참여해 주세요.             │
  * │ 초대 링크는 14일 후 만료됩니다.                 │
  * └─────────────────────────────────────────────────┘
- * 버튼: [패널 참여하기] → 웹링크
+ * 버튼: [채널추가] + [패널 참여하기] → https://linebreakers.co.kr/login (고정)
+ * ※ 버튼 URL이 고정이므로 button_1 파라미터 미전송 (템플릿 등록 버튼 그대로 사용)
  */
 export async function sendInvite(phone: string, productName: string, inviteUrl: string) {
   const tplCode = process.env.ALIGO_TPL_INVITE!
   const message =
     `[나들목] 제품 테스트 패널 초대\n\n` +
     `${productName} 테스트 패널로 초대드립니다.\n\n` +
-    `아래 버튼을 클릭하거나 링크를 복사해 참여해 주세요.\n` +
-    `${inviteUrl}\n\n` +
+    `아래 버튼을 클릭하여 참여해 주세요.\n` +
     `초대 링크는 14일 후 만료됩니다.`
-  return sendOne(phone, tplCode, message, makeButton('패널 참여하기', inviteUrl))
+  // 채널추가(AC) + 실제 초대 링크(WL) — inviteUrl에 token + client_id 포함
+  const button = JSON.stringify({
+    button: [
+      { name: '채널추가', linkType: 'AC' },
+      { name: '패널 참여하기', linkType: 'WL', linkTypeName: '웹링크', linkPc: inviteUrl, linkMo: inviteUrl },
+    ],
+  })
+  return sendOne(phone, tplCode, message, button)
 }
 
 /**

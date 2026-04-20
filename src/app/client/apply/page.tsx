@@ -17,6 +17,7 @@ const PANEL_OPTIONS: {
   priceNote: string
   duration: string
   features: string[]
+  reports: string[]
   badge?: string
   accentColor: 'go' | 'navy' | 'gold'
 }[] = [
@@ -31,8 +32,9 @@ const PANEL_OPTIONS: {
     features: [
       '직원·지인·SNS 팔로워 초대',
       '카카오 알림톡 초대 링크 발송',
-      '전체 분석 리포트 제공',
-      '신호등 판정 (Go / CGo / No-Go)',
+    ],
+    reports: [
+      '출시 안정성 판정',
     ],
     accentColor: 'go',
   },
@@ -47,10 +49,11 @@ const PANEL_OPTIONS: {
     features: [
       '나들목 검증 패널 30명 배정',
       '샘플 소분·배송 대행 포함',
-      '피부타입·연령 코호트 분석',
-      '전체 분석 리포트 제공',
     ],
-    accentColor: 'navy',
+    reports: [
+      '출시 안정성 판정',
+    ],
+    accentColor: 'go',
   },
   {
     id: 'external_50',
@@ -58,16 +61,19 @@ const PANEL_OPTIONS: {
     label: '표준 검증',
     desc: '나들목 소비자 패널 50인으로 검증',
     price: '800,000원',
-    priceNote: '크레딧 50개 소모 · 16,000원/인',
+    priceNote: '크레딧 50개 소모',
     duration: '5~7일',
     features: [
       '나들목 검증 패널 50명 배정',
       '샘플 소분·배송 대행 포함',
-      '피부타입·연령 코호트 분석',
-      '전체 분석 리포트 제공',
+    ],
+    reports: [
+      '출시 안전성 판정',
+      '핵심 구매요인 도출',
+      '치명적 단점 판단',
     ],
     badge: '추천',
-    accentColor: 'gold',
+    accentColor: 'go',
   },
 ]
 
@@ -291,6 +297,23 @@ export default function ServiceApplyPage() {
                         </li>
                       ))}
                     </ul>
+
+                    {/* 포함 보고서 */}
+                    <div className={`mt-3 pt-3 border-t ${isSelected ? 'border-current/10' : 'border-border'}`}>
+                      <p className={`text-xs font-semibold mb-1.5 ${isSelected ? accent.text : 'text-text-muted'}`}>
+                        포함 보고서
+                      </p>
+                      <ul className="space-y-1.5">
+                        {opt.reports.map((r, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-text-muted">
+                            <svg className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${isSelected ? accent.text : 'text-text-muted'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </button>
               )

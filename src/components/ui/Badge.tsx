@@ -37,15 +37,15 @@ export function VerdictBadge({ verdict }: { verdict: Verdict }) {
 
 export function StatusBadge({ status }: { status: ProjectStatus }) {
   const config: Record<ProjectStatus, { variant: BadgeVariant; label: string }> = {
-    pending: { variant: 'warning', label: '승인 대기' },
-    draft: { variant: 'default', label: '설문 설정중' },
+    pending: { variant: 'default', label: '패널 설정 중' },
+    draft: { variant: 'warning', label: '설문 설정 중' },
     confirmed: { variant: 'info', label: '관리자 확정' },
     approved: { variant: 'go', label: '고객 승인완료' },
-    recruiting: { variant: 'info', label: '패널 모집중' },
-    matching: { variant: 'warning', label: '패널 매칭중' },
-    testing: { variant: 'warning', label: '테스트 진행중' },
-    analyzing: { variant: 'info', label: '분석중' },
-    completed: { variant: 'go', label: '완료' },
+    recruiting: { variant: 'info', label: '패널 모집 중' },
+    matching: { variant: 'info', label: '패널 모집 중' },
+    testing: { variant: 'warning', label: '테스트 진행 중' },
+    analyzing: { variant: 'info', label: '분석 중' },
+    completed: { variant: 'go', label: '리포트 완료' },
     rejected: { variant: 'nogo', label: '반려' },
   }
   const { variant, label } = config[status]

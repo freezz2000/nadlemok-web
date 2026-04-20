@@ -99,9 +99,17 @@ export interface Project {
   panel_size: number
   test_duration: number
   status: ProjectStatus
+  panel_source?: 'internal' | 'external' | 'mixed'
+  external_panel_count?: number
+  delivery_service?: boolean
+  quote_total?: number
   ks_warn_threshold: number
   ks_danger_threshold: number
   satisfaction_threshold: number
+  ai_generation_count?: number
+  ai_generated_at?: string
+  dev_request_filename?: string
+  dev_request_text?: string
   created_at: string
   completed_at?: string
 }
