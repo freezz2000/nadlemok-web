@@ -9,7 +9,7 @@ interface ClientPanel {
   panel_id: string
   phone: string | null
   added_at: string
-  profile: { name: string } | null
+  profile: { name: string }[] | null
 }
 
 export default function ClientPanelsPage() {
@@ -60,7 +60,7 @@ export default function ClientPanelsPage() {
               <div key={p.id} className="flex items-center justify-between py-3">
                 <div>
                   <p className="text-sm font-medium text-text">
-                    {p.profile?.name || '이름 미등록'}
+                    {p.profile?.[0]?.name || '이름 미등록'}
                   </p>
                   <p className="text-xs text-text-muted mt-0.5">
                     {p.phone || '번호 미등록'}

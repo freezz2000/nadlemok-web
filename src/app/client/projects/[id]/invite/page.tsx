@@ -15,7 +15,7 @@ interface Invitation {
   accepted_at: string | null
   expires_at: string
   panel_id: string | null
-  panel_profile: { name: string } | null
+  panel_profile: { name: string }[] | null
 }
 
 interface SurveyPanelRow {
@@ -28,7 +28,7 @@ interface PoolPanel {
   panel_id: string
   phone: string | null
   added_at: string
-  profile: { name: string } | null
+  profile: { name: string }[] | null
 }
 
 export default function InvitePage() {
@@ -374,7 +374,7 @@ export default function InvitePage() {
               const panelId = inv.panel_id!
               const isAssigned = selectedAssignment.has(panelId)
               const isCompleted = responseMap[panelId] === true
-              const name = inv.panel_profile?.name || '이름 미등록'
+              const name = inv.panel_profile?.[0]?.name || '이름 미등록'
 
               return (
                 <label
@@ -516,7 +516,7 @@ export default function InvitePage() {
                     disabled={alreadyInvited}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text">{p.profile?.name || '이름 미등록'}</p>
+                    <p className="text-sm font-medium text-text">{p.profile?.[0]?.name || '이름 미등록'}</p>
                     <p className="text-xs text-text-muted">{p.phone || '-'}</p>
                   </div>
                   {alreadyInvited && (
@@ -599,7 +599,7 @@ export default function InvitePage() {
             {invitations.map((inv) => {
               const sl = statusLabel(inv)
               const responded = inv.panel_id ? responseMap[inv.panel_id] : false
-              const name = inv.panel_profile?.name
+              const name = inv.panel_profile?.[0]?.name
 
               return (
                 <div key={inv.id} className="flex items-center justify-between py-3">
