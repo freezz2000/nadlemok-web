@@ -9,7 +9,11 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { projectId, phones } = await req.json() as { projectId: string; phones: string[] }
+    const { projectId, phones, generateOnly } = await req.json() as {
+      projectId: string
+      phones: string[]
+      generateOnly?: boolean  // true면 알림톡 발송 없이 URL만 반환
+    }
 
     if (!projectId || !phones?.length) {
       return NextResponse.json({ error: '필수 파라미터 누락' }, { status: 400 })
@@ -84,11 +88,18 @@ export async function POST(req: NextRequest) {
         token = invite.token
       }
 
-      // 알림톡 발송 — token + client_id 포함한 초대 링크
+      // 초대 링크 생성 (token + client_id 포함)
       const inviteUrl = `${appUrl}/invite/${token}?client=${project.client_id}`
-      const { ok, message } = await sendInvite(trimmed, project.product_name, inviteUrl)
 
-      results.push({ phone: trimmed, status: ok ? 'sent' : 'alimtalk_failed', message })
+      if (generateOnly) {
+        // 알림톡 발송 없이 URL만 반환
+        results.push({ phone: trimmed, status: 'link_created', url: inviteUrl })
+        continue
+      }
+
+      // 알림톡 발송
+      const { ok, message } = await sendInvite(trimmed, project.product_name, inviteUrl)
+      results.push({ phone: trimmed, status: ok ? 'sent' : 'alimtalk_failed', message, url: inviteUrl })
     }
 
     return NextResponse.json({ results })

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const { data: invitation } = await supabase
     .from('project_invitations')
     .select(`
-      id, token, email, status, expires_at,
+      id, token, phone, status, expires_at,
       project:projects(id, product_name, product_category),
       survey:surveys(id, title)
     `)

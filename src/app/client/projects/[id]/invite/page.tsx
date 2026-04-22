@@ -64,6 +64,11 @@ export default function InvitePage() {
   const [sendingPool, setSendingPool] = useState(false)
   const [poolResult, setPoolResult] = useState<{ success: number; failed: number } | null>(null)
 
+  // 링크 직접 생성
+  const [generatingLinks, setGeneratingLinks] = useState(false)
+  const [generatedLinks, setGeneratedLinks] = useState<{ phone: string; url: string }[]>([])
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
 
@@ -175,6 +180,41 @@ export default function InvitePage() {
       else next.add(panelId)
       return next
     })
+  }
+
+  // ── 링크만 생성 (알림톡 없이) ─────────────────────────
+  async function handleGenerateLinks() {
+    if (!phoneInput.trim()) return
+    const phones = phoneInput
+      .split(/[\n,]/)
+      .map((p) => p.trim().replace(/-/g, ''))
+      .filter(Boolean)
+    if (phones.length === 0) return
+
+    setGeneratingLinks(true)
+    setGeneratedLinks([])
+    try {
+      const res = await fetch('/api/invite/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, phones, generateOnly: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        const links = (data.results as { phone: string; status: string; url?: string }[])
+          .filter((r) => r.url)
+          .map((r) => ({ phone: r.phone, url: r.url! }))
+        setGeneratedLinks(links)
+        await load()
+      }
+    } catch { /* 무시 */ }
+    setGeneratingLinks(false)
+  }
+
+  async function handleCopyLink(phone: string, url: string) {
+    await navigator.clipboard.writeText(url)
+    setCopiedPhone(phone)
+    setTimeout(() => setCopiedPhone(null), 2000)
   }
 
   // ── 알림톡 발송 ───────────────────────────────────────
@@ -555,15 +595,50 @@ export default function InvitePage() {
         <form onSubmit={handleSend} className="space-y-3">
           <textarea
             value={phoneInput}
-            onChange={(e) => setPhoneInput(e.target.value)}
+            onChange={(e) => { setPhoneInput(e.target.value); setGeneratedLinks([]) }}
             placeholder={"01012345678\n01087654321\n010-1111-2222"}
             rows={4}
             className="w-full px-3.5 py-3 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy resize-none transition-colors"
           />
-          <Button type="submit" loading={sending} disabled={!phoneInput.trim()}>
-            알림톡 발송
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="submit" loading={sending} disabled={!phoneInput.trim()}>
+              알림톡 발송
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={generatingLinks}
+              disabled={!phoneInput.trim()}
+              onClick={handleGenerateLinks}
+            >
+              링크만 생성
+            </Button>
+          </div>
         </form>
+
+        {/* 생성된 초대 링크 */}
+        {generatedLinks.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-xs font-medium text-text-muted">생성된 초대 링크 — 클립보드에 복사하거나 직접 공유하세요</p>
+            {generatedLinks.map(({ phone, url }) => (
+              <div key={phone} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
+                <span className="text-xs font-mono text-text-muted w-28 flex-shrink-0">{phone}</span>
+                <input
+                  readOnly
+                  value={url}
+                  className="flex-1 text-xs font-mono bg-transparent text-navy truncate outline-none min-w-0"
+                  onFocus={(e) => e.target.select()}
+                />
+                <button
+                  onClick={() => handleCopyLink(phone, url)}
+                  className="flex-shrink-0 text-xs px-2 py-1 rounded bg-navy text-white hover:bg-navy/90 transition-colors"
+                >
+                  {copiedPhone === phone ? '복사됨 ✓' : '복사'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {sendError && (
           <div className="mt-3 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-700">{sendError}</div>
