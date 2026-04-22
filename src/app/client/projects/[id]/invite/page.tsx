@@ -7,7 +7,8 @@ import Card, { CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
 
-interface Invitation {
+// ── 타입 ────────────────────────────────────────────────
+interface AlimtalkInvitation {
   id: string
   phone: string
   status: string
@@ -18,65 +19,64 @@ interface Invitation {
   panel_profile: { name: string }[] | null
 }
 
+interface LinkPanel {
+  panel_id: string
+  status: string
+  profile: { name: string }[] | null
+}
+
 interface SurveyPanelRow {
   panel_id: string
   status: string
 }
 
-interface PoolPanel {
-  id: string
-  panel_id: string
-  phone: string | null
-  added_at: string
-  profile: { name: string }[] | null
-}
-
+// ── 메인 컴포넌트 ────────────────────────────────────────
 export default function InvitePage() {
   const { id: projectId } = useParams<{ id: string }>()
   const supabase = createClient()
 
+  // 기본 데이터
   const [productName, setProductName] = useState('')
-  const [invitations, setInvitations] = useState<Invitation[]>([])
-  const [responseMap, setResponseMap] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(true)
+  const [surveyId, setSurveyId] = useState<string | null>(null)
+  const [surveyStatus, setSurveyStatus] = useState<string | null>(null)
+
+  // 초대 탭
+  const [inviteTab, setInviteTab] = useState<'alimtalk' | 'link'>('alimtalk')
+
+  // 알림톡 초대
   const [phoneInput, setPhoneInput] = useState('')
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [reminding, setReminding] = useState(false)
   const [remindResult, setRemindResult] = useState<{ sent: number; failed: number } | null>(null)
 
-  // 설문 상태
-  const [surveyId, setSurveyId] = useState<string | null>(null)
-  const [surveyStatus, setSurveyStatus] = useState<string | null>(null)
-  const [startingsurvey, setStartingSurvey] = useState(false)
-  const [startError, setStartError] = useState<string | null>(null)
+  // 초대링크
+  const [projectInviteLink, setProjectInviteLink] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [loadingLink, setLoadingLink] = useState(false)
 
-  // 테스트 참여 패널 선택
+  // 초대 목록
+  const [alimtalkInvitations, setAlimtalkInvitations] = useState<AlimtalkInvitation[]>([])
+  const [linkPanels, setLinkPanels] = useState<LinkPanel[]>([])
+  const [responseMap, setResponseMap] = useState<Record<string, boolean>>({})
+
+  // 패널 선택 (survey_panels 매칭)
   const [assignedPanelIds, setAssignedPanelIds] = useState<Set<string>>(new Set())
   const [selectedAssignment, setSelectedAssignment] = useState<Set<string>>(new Set())
   const [savingAssignment, setSavingAssignment] = useState(false)
   const [assignSaved, setAssignSaved] = useState(false)
 
-  // 패널 풀
-  const [poolPanels, setPoolPanels] = useState<PoolPanel[]>([])
-  const [selectedPanelIds, setSelectedPanelIds] = useState<Set<string>>(new Set())
-  const [sendingPool, setSendingPool] = useState(false)
-  const [poolResult, setPoolResult] = useState<{ success: number; failed: number } | null>(null)
+  // 설문 시작
+  const [startingsurvey, setStartingSurvey] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
 
-  // 프로젝트 단위 초대 링크
-  const [projectInviteLink, setProjectInviteLink] = useState<string>('')
-  const [linkCopied, setLinkCopied] = useState(false)
-  const [loadingLink, setLoadingLink] = useState(false)
-
-  // 링크 직접 생성 (phone-based)
-  const [generatingLinks, setGeneratingLinks] = useState(false)
-  const [generatedLinks, setGeneratedLinks] = useState<{ phone: string; url: string }[]>([])
-  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
-
+  // ── 데이터 로드 ─────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
 
+    // 프로젝트명
     const { data: proj } = await supabase
       .from('projects')
       .select('product_name')
@@ -84,7 +84,7 @@ export default function InvitePage() {
       .single()
     if (proj) setProductName(proj.product_name)
 
-    // 프로젝트 초대 링크 로드
+    // 초대 링크
     if (!projectInviteLink) {
       setLoadingLink(true)
       fetch(`/api/invite/project-link?projectId=${projectId}`)
@@ -94,77 +94,157 @@ export default function InvitePage() {
         .finally(() => setLoadingLink(false))
     }
 
-    // 설문 로드
+    // 최신 설문
     const { data: surveys } = await supabase
       .from('surveys')
       .select('id, status')
       .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
       .limit(1)
     const survey = surveys?.[0] ?? null
-    if (survey) {
-      setSurveyId(survey.id)
-      setSurveyStatus(survey.status)
-    }
+    setSurveyId(survey?.id ?? null)
+    setSurveyStatus(survey?.status ?? null)
 
-    // 초대 현황 (패널 이름 포함)
+    // 알림톡 초대 목록
     const { data: invs } = await supabase
       .from('project_invitations')
       .select('id, phone, status, invited_at, accepted_at, expires_at, panel_id, panel_profile:profiles!panel_id(name)')
       .eq('project_id', projectId)
       .order('invited_at', { ascending: false })
-    setInvitations((invs as Invitation[]) || [])
+    const invList = (invs as AlimtalkInvitation[]) || []
+    setAlimtalkInvitations(invList)
 
-    const acceptedPanelIds = (invs || [])
-      .filter((inv) => inv.panel_id && inv.status === 'accepted')
-      .map((inv) => inv.panel_id as string)
+    // 알림톡으로 가입 완료된 패널 ID 목록
+    const alimtalkPanelIdSet = new Set(
+      invList.filter((i) => i.panel_id && i.status === 'accepted').map((i) => i.panel_id!)
+    )
 
-    // survey_panels 로드 → 응답 완료 여부 + 현재 배정 목록
-    if (acceptedPanelIds.length > 0 && survey?.id) {
-      const { data: panels } = await supabase
+    // survey_panels 로드 → 응답여부 + 배정목록 + 링크 가입 패널
+    if (survey?.id) {
+      const { data: surveyPanels } = await supabase
         .from('survey_panels')
-        .select('panel_id, status')
+        .select('panel_id, status, profile:profiles!panel_id(name)')
         .eq('survey_id', survey.id)
-        .in('panel_id', acceptedPanelIds)
 
-      const map: Record<string, boolean> = {}
+      const rows = (surveyPanels as (SurveyPanelRow & { profile: { name: string }[] | null })[]) || []
+
+      const responseM: Record<string, boolean> = {}
       const assignedIds = new Set<string>()
-      ;(panels as SurveyPanelRow[] || []).forEach((p) => {
-        map[p.panel_id] = p.status === 'completed'
-        assignedIds.add(p.panel_id)
+      const linkJoined: LinkPanel[] = []
+
+      rows.forEach((sp) => {
+        responseM[sp.panel_id] = sp.status === 'completed'
+        assignedIds.add(sp.panel_id)
+        // 알림톡으로 온 패널이 아닌 경우 → 링크 가입
+        if (!alimtalkPanelIdSet.has(sp.panel_id)) {
+          linkJoined.push({ panel_id: sp.panel_id, status: sp.status, profile: sp.profile ?? null })
+        }
       })
-      setResponseMap(map)
+
+      setResponseMap(responseM)
       setAssignedPanelIds(assignedIds)
       setSelectedAssignment(new Set(assignedIds))
+      setLinkPanels(linkJoined)
     } else {
       setResponseMap({})
       setAssignedPanelIds(new Set())
       setSelectedAssignment(new Set())
+      setLinkPanels([])
     }
 
-    // 패널 풀 로드
-    const { data: pool } = await supabase
-      .from('client_panels')
-      .select('id, panel_id, phone, added_at, profile:profiles!panel_id(name)')
-      .order('added_at', { ascending: false })
-    setPoolPanels((pool as PoolPanel[]) || [])
-
     setLoading(false)
-  }, [projectId, supabase])
+  }, [projectId, supabase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
 
-  // 이미 초대된 전화번호 목록
-  const invitedPhones = new Set(invitations.map((inv) => inv.phone))
+  // ── 핸들러 ──────────────────────────────────────────────
 
-  // ── 테스트 패널 배정 저장 ──────────────────────────────
+  // 초대링크 복사
+  async function handleCopyLink() {
+    if (!projectInviteLink) return
+    await navigator.clipboard.writeText(projectInviteLink)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  // 알림톡 발송
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault()
+    const phones = phoneInput.split(/[\n,]/).map((p) => p.trim().replace(/-/g, '')).filter(Boolean)
+    if (!phones.length) return
+    setSending(true)
+    setSendResult(null)
+    setSendError(null)
+    try {
+      const res = await fetch('/api/invite/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, phones }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setSendError(data.error || `오류가 발생했습니다. (${res.status})`)
+      } else {
+        const results = data.results as { phone: string; status: string; message?: string }[]
+        const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
+        const failed = results.filter((r) => r.status === 'error' || r.status === 'alimtalk_failed').length
+        const errors = results
+          .filter((r) => r.status === 'error' || r.status === 'alimtalk_failed')
+          .map((r) => `${r.phone}: ${r.message || r.status}`)
+        setSendResult({ success, failed, errors })
+        setPhoneInput('')
+        await load()
+      }
+    } catch {
+      setSendError('네트워크 오류가 발생했습니다.')
+    }
+    setSending(false)
+  }
+
+  // 재발송
+  async function handleResend(phone: string) {
+    await fetch('/api/invite/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, phones: [phone] }),
+    })
+    await load()
+  }
+
+  // 독촉 알림톡
+  async function handleRemind() {
+    setReminding(true)
+    setRemindResult(null)
+    try {
+      const res = await fetch('/api/invite/remind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const data = await res.json()
+      if (res.ok) setRemindResult({ sent: data.sent, failed: data.failed })
+    } catch { /* 무시 */ }
+    setReminding(false)
+  }
+
+  // 패널 선택 토글
+  function toggleAssignment(panelId: string) {
+    setAssignSaved(false)
+    setSelectedAssignment((prev) => {
+      const next = new Set(prev)
+      if (next.has(panelId)) next.delete(panelId)
+      else next.add(panelId)
+      return next
+    })
+  }
+
+  // 패널 선택 저장
   async function handleSaveAssignment() {
     if (!surveyId) return
     setSavingAssignment(true)
     setAssignSaved(false)
-
     const toAdd = [...selectedAssignment].filter((id) => !assignedPanelIds.has(id))
     const toRemove = [...assignedPanelIds].filter((id) => !selectedAssignment.has(id) && !responseMap[id])
-
     try {
       if (toAdd.length > 0) {
         await fetch('/api/surveys/assign-panels', {
@@ -187,127 +267,7 @@ export default function InvitePage() {
     }
   }
 
-  function toggleAssignment(panelId: string) {
-    setAssignSaved(false)
-    setSelectedAssignment((prev) => {
-      const next = new Set(prev)
-      if (next.has(panelId)) next.delete(panelId)
-      else next.add(panelId)
-      return next
-    })
-  }
-
-  // ── 프로젝트 초대 링크 복사 ───────────────────────────
-  async function handleCopyProjectLink() {
-    if (!projectInviteLink) return
-    await navigator.clipboard.writeText(projectInviteLink)
-    setLinkCopied(true)
-    setTimeout(() => setLinkCopied(false), 2000)
-  }
-
-  // ── 링크만 생성 (알림톡 없이) ─────────────────────────
-  async function handleGenerateLinks() {
-    if (!phoneInput.trim()) return
-    const phones = phoneInput
-      .split(/[\n,]/)
-      .map((p) => p.trim().replace(/-/g, ''))
-      .filter(Boolean)
-    if (phones.length === 0) return
-
-    setGeneratingLinks(true)
-    setGeneratedLinks([])
-    try {
-      const res = await fetch('/api/invite/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, phones, generateOnly: true }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        const links = (data.results as { phone: string; status: string; url?: string }[])
-          .filter((r) => r.url)
-          .map((r) => ({ phone: r.phone, url: r.url! }))
-        setGeneratedLinks(links)
-        await load()
-      }
-    } catch { /* 무시 */ }
-    setGeneratingLinks(false)
-  }
-
-  async function handleCopyLink(phone: string, url: string) {
-    await navigator.clipboard.writeText(url)
-    setCopiedPhone(phone)
-    setTimeout(() => setCopiedPhone(null), 2000)
-  }
-
-  // ── 알림톡 발송 ───────────────────────────────────────
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault()
-    if (!phoneInput.trim()) return
-
-    const phones = phoneInput
-      .split(/[\n,]/)
-      .map((p) => p.trim().replace(/-/g, ''))
-      .filter(Boolean)
-
-    if (phones.length === 0) return
-
-    setSending(true)
-    setSendResult(null)
-    setSendError(null)
-
-    try {
-      const res = await fetch('/api/invite/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, phones }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        setSendError(data.error || `오류가 발생했습니다. (${res.status})`)
-      } else {
-        const results = data.results as { phone: string; status: string; message?: string }[]
-        const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
-        const failed = results.filter((r) => r.status === 'error' || r.status === 'alimtalk_failed').length
-        const errors = results
-          .filter((r) => r.status === 'error' || r.status === 'alimtalk_failed')
-          .map((r) => `${r.phone}: ${r.message || r.status}`)
-        setSendResult({ success, failed, errors })
-        setPhoneInput('')
-        await load()
-      }
-    } catch {
-      setSendError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
-    }
-
-    setSending(false)
-  }
-
-  async function handleResend(phone: string) {
-    await fetch('/api/invite/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, phones: [phone] }),
-    })
-    await load()
-  }
-
-  async function handleRemind() {
-    setReminding(true)
-    setRemindResult(null)
-    try {
-      const res = await fetch('/api/invite/remind', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      })
-      const data = await res.json()
-      if (res.ok) setRemindResult({ sent: data.sent, failed: data.failed })
-    } catch { /* 무시 */ }
-    setReminding(false)
-  }
-
+  // 설문 시작
   async function handleStartSurvey() {
     if (!surveyId) return
     setStartingSurvey(true)
@@ -328,209 +288,398 @@ export default function InvitePage() {
     }
   }
 
-  // ── 패널 풀에서 선택 발송 ─────────────────────────────
-  async function handleSendFromPool() {
-    const selected = poolPanels.filter((p) => selectedPanelIds.has(p.id) && p.phone)
-    if (selected.length === 0) return
-
-    setSendingPool(true)
-    setPoolResult(null)
-
-    const phones = selected.map((p) => p.phone as string)
-    try {
-      const res = await fetch('/api/invite/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, phones }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        const results = data.results as { status: string }[]
-        const success = results.filter((r) => r.status === 'sent' || r.status === 'already_accepted').length
-        const failed = results.filter((r) => r.status === 'error' || r.status === 'alimtalk_failed').length
-        setPoolResult({ success, failed })
-        setSelectedPanelIds(new Set())
-        await load()
-      }
-    } catch { /* 무시 */ }
-
-    setSendingPool(false)
-  }
-
-  function togglePool(id: string) {
-    setSelectedPanelIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
-  function toggleAllPool() {
-    const selectable = poolPanels.filter((p) => p.phone && !invitedPhones.has(p.phone))
-    if (selectedPanelIds.size === selectable.length) {
-      setSelectedPanelIds(new Set())
-    } else {
-      setSelectedPanelIds(new Set(selectable.map((p) => p.id)))
-    }
-  }
-
-  const statusLabel = (inv: Invitation) => {
+  // ── 파생 값 ─────────────────────────────────────────────
+  const alimtalkStatusLabel = (inv: AlimtalkInvitation) => {
     if (inv.status === 'accepted') return { text: '가입 완료', color: 'text-green-600 bg-green-50' }
-    if (inv.status === 'expired' || new Date(inv.expires_at) < new Date()) return { text: '만료', color: 'text-gray-400 bg-gray-100' }
+    if (inv.status === 'expired' || new Date(inv.expires_at) < new Date())
+      return { text: '만료', color: 'text-gray-400 bg-gray-100' }
     return { text: '미가입', color: 'text-amber-600 bg-amber-50' }
   }
 
-  const acceptedInvitations = invitations.filter((i) => i.status === 'accepted' && i.panel_id)
-  const registeredCount = acceptedInvitations.length
-  const pendingCount = invitations.filter((i) => i.status === 'pending').length
+  const acceptedAlimtalk = alimtalkInvitations.filter((i) => i.status === 'accepted' && i.panel_id)
+  const pendingCount = alimtalkInvitations.filter((i) => i.status === 'pending').length
+  const totalAccepted = acceptedAlimtalk.length + linkPanels.length
   const respondedCount = Object.values(responseMap).filter(Boolean).length
   const assignmentChanged =
     selectedAssignment.size !== assignedPanelIds.size ||
     [...selectedAssignment].some((id) => !assignedPanelIds.has(id))
 
-  const selectablePoolPanels = poolPanels.filter((p) => p.phone && !invitedPhones.has(p.phone))
+  // 패널 선택 대상: 알림톡 가입 + 링크 가입 전체
+  const allAcceptedPanels: { panelId: string; name: string; phone?: string; source: 'alimtalk' | 'link' }[] = [
+    ...acceptedAlimtalk.map((inv) => ({
+      panelId: inv.panel_id!,
+      name: inv.panel_profile?.[0]?.name || '이름 미등록',
+      phone: inv.phone,
+      source: 'alimtalk' as const,
+    })),
+    ...linkPanels.map((lp) => ({
+      panelId: lp.panel_id,
+      name: lp.profile?.[0]?.name || '이름 미등록',
+      source: 'link' as const,
+    })),
+  ]
 
+  // ── 렌더 ─────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <Link href={`/client/projects/${projectId}`} className="text-sm text-text-muted hover:text-text mb-1 inline-block">
-            ← 프로젝트로 돌아가기
-          </Link>
-          <h1 className="text-2xl font-bold text-text">패널 초대</h1>
-          {productName && <p className="text-sm text-text-muted mt-0.5">{productName}</p>}
-        </div>
+      {/* 헤더 */}
+      <div className="mb-6">
+        <Link href={`/client/projects/${projectId}`} className="text-sm text-text-muted hover:text-text mb-1 inline-block">
+          ← 프로젝트로 돌아가기
+        </Link>
+        <h1 className="text-2xl font-bold text-text">패널 초대</h1>
+        {productName && <p className="text-sm text-text-muted mt-0.5">{productName}</p>}
       </div>
 
-      {/* ── 프로젝트 초대 링크 ───────────────────────────── */}
-      <Card className="mb-6 border-navy/20 bg-navy/[0.02]">
-        <CardTitle>초대 링크</CardTitle>
-        <p className="text-sm text-text-muted mt-1 mb-3">
-          이 링크를 직원들에게 공유하세요. 링크를 클릭하면 패널로 가입하고 바로 설문에 참여할 수 있습니다.
-        </p>
-        {loadingLink ? (
-          <div className="flex items-center gap-2 text-xs text-text-muted py-2">
-            <div className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
-            링크 생성 중...
+      {/* 설문 진행 중 배너 */}
+      {surveyStatus === 'active' && (
+        <div className="mb-5 p-3.5 rounded-xl bg-go-bg border border-go/20 flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-go animate-pulse flex-shrink-0" />
+          <p className="text-sm font-medium text-go">설문 진행 중 · {respondedCount}명 응답 완료</p>
+        </div>
+      )}
+
+      {/* ── 섹션 1: 초대하기 (탭) ─────────────────────────── */}
+      <Card className="mb-5">
+        {/* 탭 헤더 */}
+        <div className="flex gap-1 mb-5 p-1 bg-gray-100 rounded-lg">
+          <button
+            onClick={() => setInviteTab('alimtalk')}
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+              inviteTab === 'alimtalk'
+                ? 'bg-white text-navy shadow-sm'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            카카오 알림톡 초대
+          </button>
+          <button
+            onClick={() => setInviteTab('link')}
+            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+              inviteTab === 'link'
+                ? 'bg-white text-navy shadow-sm'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            초대링크 공유
+          </button>
+        </div>
+
+        {/* 탭 1: 알림톡 */}
+        {inviteTab === 'alimtalk' && (
+          <div>
+            <p className="text-sm text-text-muted mb-3">
+              초대할 휴대폰 번호를 입력하세요. 한 줄에 하나씩 입력하거나 쉼표로 구분합니다.
+            </p>
+            <form onSubmit={handleSend} className="space-y-3">
+              <textarea
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder={'01012345678\n01087654321\n010-1111-2222'}
+                rows={4}
+                className="w-full px-3.5 py-3 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy resize-none transition-colors"
+              />
+              <Button type="submit" loading={sending} disabled={!phoneInput.trim()}>
+                카카오 알림톡 발송
+              </Button>
+            </form>
+
+            {sendError && (
+              <div className="mt-3 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-700">{sendError}</div>
+            )}
+            {sendResult && (
+              <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${sendResult.failed === 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                {sendResult.success}명 발송 완료
+                {sendResult.failed > 0 && `, ${sendResult.failed}명 실패`}
+                {sendResult.errors.length > 0 && (
+                  <ul className="mt-1.5 space-y-0.5 text-xs opacity-80">
+                    {sendResult.errors.map((e, i) => <li key={i} className="font-mono">{e}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* 독촉 */}
+            {pendingCount > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between gap-4">
+                <p className="text-xs text-amber-700">
+                  미가입 {pendingCount}명에게 독촉 알림톡을 보낼 수 있습니다.
+                </p>
+                <Button variant="secondary" size="sm" onClick={handleRemind} loading={reminding}>
+                  독촉 발송
+                </Button>
+              </div>
+            )}
+            {remindResult && (
+              <p className={`text-xs mt-2 ${remindResult.failed === 0 ? 'text-go' : 'text-amber-700'}`}>
+                {remindResult.sent}명 발송 완료{remindResult.failed > 0 && `, ${remindResult.failed}명 실패`}
+              </p>
+            )}
           </div>
-        ) : projectInviteLink ? (
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={projectInviteLink}
-              onFocus={(e) => e.target.select()}
-              className="flex-1 px-3 py-2 text-xs font-mono bg-white border border-gray-200 rounded-lg text-navy truncate outline-none focus:ring-2 focus:ring-navy/20 min-w-0"
-            />
-            <button
-              onClick={handleCopyProjectLink}
-              className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                linkCopied
-                  ? 'bg-go text-white'
-                  : 'bg-navy text-white hover:bg-navy/90'
-              }`}
-            >
-              {linkCopied ? '복사됨 ✓' : '복사'}
-            </button>
+        )}
+
+        {/* 탭 2: 초대링크 */}
+        {inviteTab === 'link' && (
+          <div>
+            <p className="text-sm text-text-muted mb-3">
+              이 링크를 복사해 카카오톡, 이메일, 메신저 등으로 공유하세요.
+              링크를 클릭하면 패널로 가입하고 바로 설문에 참여할 수 있습니다.
+            </p>
+            {loadingLink ? (
+              <div className="flex items-center gap-2 text-xs text-text-muted py-3">
+                <div className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+                링크 생성 중...
+              </div>
+            ) : projectInviteLink ? (
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={projectInviteLink}
+                  onFocus={(e) => e.target.select()}
+                  className="flex-1 px-3 py-2.5 text-xs font-mono bg-gray-50 border border-gray-200 rounded-lg text-navy truncate outline-none focus:ring-2 focus:ring-navy/20 min-w-0"
+                />
+                <button
+                  onClick={handleCopyLink}
+                  className={`flex-shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    linkCopied ? 'bg-go text-white' : 'bg-navy text-white hover:bg-navy/90'
+                  }`}
+                >
+                  {linkCopied ? '복사됨 ✓' : '복사'}
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted">링크를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.</p>
+            )}
           </div>
-        ) : (
-          <p className="text-xs text-text-muted">링크를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.</p>
         )}
       </Card>
 
-      {/* 현황 요약 */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
-        <Card padding="sm">
-          <p className="text-xs text-text-muted">초대 발송</p>
-          <p className="text-2xl font-bold text-text">{invitations.length}</p>
-        </Card>
-        <Card padding="sm">
-          <p className="text-xs text-text-muted">가입 완료</p>
-          <p className="text-2xl font-bold text-navy">{registeredCount}</p>
-        </Card>
-        <Card padding="sm">
-          <p className="text-xs text-text-muted">테스트 배정</p>
-          <p className="text-2xl font-bold text-cgo">{assignedPanelIds.size}</p>
-        </Card>
-        <Card padding="sm">
-          <p className="text-xs text-text-muted">설문 응답</p>
-          <p className="text-2xl font-bold text-go">{respondedCount}</p>
-        </Card>
-      </div>
+      {/* ── 섹션 2: 초대 목록 ──────────────────────────────── */}
+      <Card className="mb-5">
+        <div className="flex items-center justify-between mb-1">
+          <CardTitle>초대 목록</CardTitle>
+          <span className="text-xs text-text-muted">총 가입 {totalAccepted}명</span>
+        </div>
+        <p className="text-xs text-text-muted mb-4">개인 응답 내용은 패널 프라이버시 보호를 위해 공개되지 않습니다.</p>
 
-      {/* ── 테스트 참여 패널 선택 ──────────────────────── */}
-      {acceptedInvitations.length > 0 && surveyId && (
-        <Card className="mb-6">
-          <CardTitle>테스트 참여 패널 선택</CardTitle>
-          <p className="text-sm text-text-muted mt-1 mb-4">
-            가입 완료된 패널 중 이번 프로젝트 테스트에 참여할 패널을 선택하세요.
-            응답을 완료한 패널은 제외할 수 없습니다.
+        {loading ? (
+          <div className="py-8 text-center">
+            <div className="w-6 h-6 border-2 border-navy border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        ) : (
+          <>
+            {/* 알림톡 초대 */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                카카오 알림톡 초대
+                <span className="font-normal">({alimtalkInvitations.length}명)</span>
+              </p>
+              {alimtalkInvitations.length === 0 ? (
+                <p className="text-sm text-text-muted py-2 pl-3">아직 발송된 알림톡이 없습니다</p>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {alimtalkInvitations.map((inv) => {
+                    const sl = alimtalkStatusLabel(inv)
+                    const responded = inv.panel_id ? responseMap[inv.panel_id] : false
+                    const name = inv.panel_profile?.[0]?.name
+                    return (
+                      <div key={inv.id} className="flex items-center justify-between py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-text">
+                            {name ? `${name} · ` : ''}{inv.phone}
+                          </p>
+                          <p className="text-xs text-text-muted mt-0.5">
+                            {new Date(inv.invited_at).toLocaleDateString('ko-KR')} 초대
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sl.color}`}>
+                            {sl.text}
+                          </span>
+                          {inv.status === 'accepted' && (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              responded ? 'text-go bg-go-bg' : 'text-gray-400 bg-gray-100'
+                            }`}>
+                              {responded ? '응답 완료' : '미응답'}
+                            </span>
+                          )}
+                          {inv.status === 'pending' && (
+                            <button
+                              onClick={() => handleResend(inv.phone)}
+                              className="text-xs text-navy hover:underline"
+                            >
+                              재발송
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 초대링크 가입 */}
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-navy inline-block" />
+                초대링크 가입
+                <span className="font-normal">({linkPanels.length}명)</span>
+              </p>
+              {linkPanels.length === 0 ? (
+                <p className="text-sm text-text-muted py-2 pl-3">아직 링크로 가입한 패널이 없습니다</p>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {linkPanels.map((lp) => {
+                    const responded = responseMap[lp.panel_id] === true
+                    const name = lp.profile?.[0]?.name || '이름 미등록'
+                    return (
+                      <div key={lp.panel_id} className="flex items-center justify-between py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-text">{name}</p>
+                          <p className="text-xs text-text-muted mt-0.5">링크로 가입</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full text-green-600 bg-green-50">
+                            가입 완료
+                          </span>
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            responded ? 'text-go bg-go-bg' : 'text-gray-400 bg-gray-100'
+                          }`}>
+                            {responded ? '응답 완료' : '미응답'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* ── 섹션 3: 패널 선택 ──────────────────────────────── */}
+      <Card className="mb-5">
+        <div className="flex items-center justify-between mb-1">
+          <CardTitle>패널 선택</CardTitle>
+          <span className="text-xs text-text-muted">
+            {selectedAssignment.size}명 선택됨
+          </span>
+        </div>
+        <p className="text-sm text-text-muted mt-1 mb-4">
+          가입 완료된 패널 중 이번 설문에 참여할 패널을 선택하세요.
+          응답을 완료한 패널은 제외할 수 없습니다.
+        </p>
+
+        {allAcceptedPanels.length === 0 ? (
+          <p className="text-sm text-text-muted py-4 text-center">
+            아직 가입 완료된 패널이 없습니다
           </p>
+        ) : (
+          <>
+            {/* 전체 선택 */}
+            <label className="flex items-center gap-2.5 pb-3 mb-1 border-b border-gray-100 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-gray-300 text-navy"
+                checked={
+                  selectedAssignment.size === allAcceptedPanels.length &&
+                  allAcceptedPanels.length > 0
+                }
+                onChange={(e) => {
+                  setAssignSaved(false)
+                  if (e.target.checked) {
+                    setSelectedAssignment(new Set(allAcceptedPanels.map((p) => p.panelId)))
+                  } else {
+                    // 응답 완료된 패널은 유지
+                    setSelectedAssignment(
+                      new Set(
+                        allAcceptedPanels
+                          .filter((p) => responseMap[p.panelId])
+                          .map((p) => p.panelId)
+                      )
+                    )
+                  }
+                }}
+              />
+              <span className="text-xs font-medium text-text-muted">
+                전체 선택 ({allAcceptedPanels.length}명)
+              </span>
+            </label>
 
-          <div className="divide-y divide-gray-50">
-            {acceptedInvitations.map((inv) => {
-              const panelId = inv.panel_id!
-              const isAssigned = selectedAssignment.has(panelId)
-              const isCompleted = responseMap[panelId] === true
-              const name = inv.panel_profile?.[0]?.name || '이름 미등록'
+            <div className="divide-y divide-gray-50">
+              {allAcceptedPanels.map(({ panelId, name, phone, source }) => {
+                const isAssigned = selectedAssignment.has(panelId)
+                const isCompleted = responseMap[panelId] === true
+                return (
+                  <label
+                    key={panelId}
+                    className={`flex items-center gap-3 py-2.5 ${
+                      isCompleted
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isAssigned}
+                      disabled={isCompleted}
+                      onChange={() => !isCompleted && toggleAssignment(panelId)}
+                      className="w-4 h-4 rounded border-gray-300 text-navy cursor-pointer flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text">{name}</p>
+                      <p className="text-xs text-text-muted">
+                        {source === 'alimtalk' ? phone : '링크로 가입'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <span className={`text-xs px-1.5 py-0.5 rounded text-gray-400 bg-gray-100 ${
+                        source === 'link' ? 'text-navy/60 bg-navy/5' : ''
+                      }`}>
+                        {source === 'alimtalk' ? '알림톡' : '링크'}
+                      </span>
+                      {isCompleted ? (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full text-go bg-go-bg">응답 완료</span>
+                      ) : isAssigned ? (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full text-navy bg-navy/10">배정</span>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full text-gray-400 bg-gray-100">미배정</span>
+                      )}
+                    </div>
+                  </label>
+                )
+              })}
+            </div>
 
-              return (
-                <label
-                  key={inv.id}
-                  className={`flex items-center gap-3 py-3 ${isCompleted ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isAssigned}
-                    disabled={isCompleted}
-                    onChange={() => !isCompleted && toggleAssignment(panelId)}
-                    className="w-4 h-4 rounded border-gray-300 text-navy cursor-pointer flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text">{name}</p>
-                    <p className="text-xs text-text-muted">{inv.phone}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {isCompleted ? (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full text-go bg-go-bg">응답 완료</span>
-                    ) : isAssigned ? (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full text-navy bg-navy/10">테스트 중</span>
-                    ) : (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full text-gray-400 bg-gray-100">미배정</span>
-                    )}
-                  </div>
-                </label>
-              )
-            })}
-          </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <Button
-              onClick={handleSaveAssignment}
-              loading={savingAssignment}
-              disabled={!assignmentChanged}
-              size="sm"
-            >
-              변경 사항 저장
-            </Button>
-            {assignSaved && (
-              <p className="text-xs text-go">저장됐습니다</p>
-            )}
-            {assignmentChanged && !assignSaved && (
-              <p className="text-xs text-amber-600">저장되지 않은 변경사항이 있습니다</p>
-            )}
-          </div>
-        </Card>
-      )}
+            <div className="mt-4 flex items-center gap-3">
+              <Button
+                onClick={handleSaveAssignment}
+                loading={savingAssignment}
+                disabled={!assignmentChanged}
+                size="sm"
+              >
+                패널 선택 저장
+              </Button>
+              {assignSaved && <p className="text-xs text-go">저장됐습니다</p>}
+              {assignmentChanged && !assignSaved && (
+                <p className="text-xs text-amber-600">저장되지 않은 변경사항이 있습니다</p>
+              )}
+            </div>
+          </>
+        )}
+      </Card>
 
       {/* 설문 시작 버튼 */}
-      {surveyId && surveyStatus !== 'active' && registeredCount > 0 && (
-        <Card className="mb-6 border-navy/20 bg-navy/[0.02]">
+      {surveyId && surveyStatus !== 'active' && totalAccepted > 0 && (
+        <Card className="border-navy/20 bg-navy/[0.02]">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-navy">설문을 시작할 준비가 됐나요?</p>
               <p className="text-xs text-text-muted mt-1">
-                배정된 패널 {assignedPanelIds.size}명이 설문에 응답할 수 있습니다.
+                선택된 패널 {selectedAssignment.size}명이 설문에 응답할 수 있습니다.
                 {pendingCount > 0 && ` (아직 미가입 ${pendingCount}명)`}
               </p>
             </div>
@@ -541,230 +690,6 @@ export default function InvitePage() {
           {startError && <p className="text-xs text-nogo mt-3">{startError}</p>}
         </Card>
       )}
-
-      {/* 설문 진행 중 배너 */}
-      {surveyStatus === 'active' && (
-        <div className="mb-6 p-4 rounded-xl bg-go-bg border border-go/20 flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-go animate-pulse flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-go">설문 진행 중</p>
-            <p className="text-xs text-text-muted mt-0.5">패널들이 설문에 응답하고 있습니다.</p>
-          </div>
-        </div>
-      )}
-
-      {/* 독촉 알림톡 */}
-      {pendingCount > 0 && (
-        <Card className="mb-6 border-amber-200 bg-amber-50/40">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-amber-800">미가입 패널에게 독촉 알림톡</p>
-              <p className="text-xs text-amber-700 mt-0.5">
-                아직 가입하지 않은 {pendingCount}명에게 설문 참여를 독촉합니다.
-              </p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={handleRemind} loading={reminding}>
-              독촉 발송
-            </Button>
-          </div>
-          {remindResult && (
-            <p className={`text-xs mt-3 ${remindResult.failed === 0 ? 'text-go' : 'text-amber-700'}`}>
-              {remindResult.sent}명 발송 완료{remindResult.failed > 0 && `, ${remindResult.failed}명 실패`}
-            </p>
-          )}
-        </Card>
-      )}
-
-      {/* 내 패널 풀에서 선택 */}
-      {poolPanels.length > 0 && (
-        <Card className="mb-6">
-          <CardTitle>내 패널에서 선택</CardTitle>
-          <p className="text-sm text-text-muted mt-1 mb-4">
-            이전에 함께한 패널을 선택해 알림톡을 발송합니다.
-            이미 초대된 패널은 비활성화됩니다.
-          </p>
-
-          {selectablePoolPanels.length > 0 && (
-            <label className="flex items-center gap-2.5 pb-3 mb-1 border-b border-gray-100 cursor-pointer">
-              <input
-                type="checkbox"
-                className="w-4 h-4 rounded border-gray-300 text-navy cursor-pointer"
-                checked={selectedPanelIds.size === selectablePoolPanels.length && selectablePoolPanels.length > 0}
-                onChange={toggleAllPool}
-              />
-              <span className="text-xs font-medium text-text-muted">
-                전체 선택 ({selectablePoolPanels.length}명)
-              </span>
-            </label>
-          )}
-
-          <div className="divide-y divide-gray-50 max-h-64 overflow-y-auto">
-            {poolPanels.map((p) => {
-              const alreadyInvited = p.phone ? invitedPhones.has(p.phone) : true
-              return (
-                <label
-                  key={p.id}
-                  className={`flex items-center gap-3 py-2.5 ${alreadyInvited ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 rounded-lg px-1'}`}
-                >
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-gray-300 text-navy cursor-pointer flex-shrink-0"
-                    checked={selectedPanelIds.has(p.id)}
-                    onChange={() => !alreadyInvited && togglePool(p.id)}
-                    disabled={alreadyInvited}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text">{p.profile?.[0]?.name || '이름 미등록'}</p>
-                    <p className="text-xs text-text-muted">{p.phone || '-'}</p>
-                  </div>
-                  {alreadyInvited && (
-                    <span className="text-xs text-gray-400 flex-shrink-0">이미 초대됨</span>
-                  )}
-                </label>
-              )
-            })}
-          </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <Button
-              onClick={handleSendFromPool}
-              loading={sendingPool}
-              disabled={selectedPanelIds.size === 0}
-              size="sm"
-            >
-              선택한 {selectedPanelIds.size > 0 ? `${selectedPanelIds.size}명에게 ` : ''}알림톡 발송
-            </Button>
-            {poolResult && (
-              <p className={`text-xs ${poolResult.failed === 0 ? 'text-go' : 'text-amber-600'}`}>
-                {poolResult.success}명 발송 완료
-                {poolResult.failed > 0 && `, ${poolResult.failed}명 실패`}
-              </p>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* 전화번호 직접 입력 */}
-      <Card className="mb-6">
-        <CardTitle>카카오 알림톡 초대 발송</CardTitle>
-        <p className="text-sm text-text-muted mt-1 mb-4">
-          초대할 휴대폰 번호를 입력하세요. 링크를 통해 패널로 가입하고 바로 설문에 참여할 수 있습니다.
-        </p>
-        <form onSubmit={handleSend} className="space-y-3">
-          <textarea
-            value={phoneInput}
-            onChange={(e) => { setPhoneInput(e.target.value); setGeneratedLinks([]) }}
-            placeholder={"01012345678\n01087654321\n010-1111-2222"}
-            rows={4}
-            className="w-full px-3.5 py-3 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy resize-none transition-colors"
-          />
-          <div className="flex items-center gap-2">
-            <Button type="submit" loading={sending} disabled={!phoneInput.trim()}>
-              알림톡 발송
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              loading={generatingLinks}
-              disabled={!phoneInput.trim()}
-              onClick={handleGenerateLinks}
-            >
-              링크만 생성
-            </Button>
-          </div>
-        </form>
-
-        {/* 생성된 초대 링크 */}
-        {generatedLinks.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs font-medium text-text-muted">생성된 초대 링크 — 클립보드에 복사하거나 직접 공유하세요</p>
-            {generatedLinks.map(({ phone, url }) => (
-              <div key={phone} className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg">
-                <span className="text-xs font-mono text-text-muted w-28 flex-shrink-0">{phone}</span>
-                <input
-                  readOnly
-                  value={url}
-                  className="flex-1 text-xs font-mono bg-transparent text-navy truncate outline-none min-w-0"
-                  onFocus={(e) => e.target.select()}
-                />
-                <button
-                  onClick={() => handleCopyLink(phone, url)}
-                  className="flex-shrink-0 text-xs px-2 py-1 rounded bg-navy text-white hover:bg-navy/90 transition-colors"
-                >
-                  {copiedPhone === phone ? '복사됨 ✓' : '복사'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {sendError && (
-          <div className="mt-3 px-3 py-2 rounded-lg text-sm bg-red-50 text-red-700">{sendError}</div>
-        )}
-        {sendResult && (
-          <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${sendResult.failed === 0 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-            {sendResult.success}명 발송 완료
-            {sendResult.failed > 0 && `, ${sendResult.failed}명 실패`}
-            {sendResult.errors.length > 0 && (
-              <ul className="mt-1.5 space-y-0.5 text-xs opacity-80">
-                {sendResult.errors.map((e, i) => <li key={i} className="font-mono">{e}</li>)}
-              </ul>
-            )}
-          </div>
-        )}
-      </Card>
-
-      {/* 초대 현황 테이블 */}
-      <Card>
-        <CardTitle>초대 현황</CardTitle>
-        <p className="text-xs text-text-muted mt-1 mb-4">
-          개인 응답 내용은 패널 프라이버시 보호를 위해 공개되지 않습니다.
-        </p>
-
-        {loading ? (
-          <div className="py-8 text-center">
-            <div className="w-6 h-6 border-2 border-navy border-t-transparent rounded-full animate-spin mx-auto" />
-          </div>
-        ) : invitations.length === 0 ? (
-          <div className="py-8 text-center text-text-muted text-sm">아직 초대한 패널이 없습니다</div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {invitations.map((inv) => {
-              const sl = statusLabel(inv)
-              const responded = inv.panel_id ? responseMap[inv.panel_id] : false
-              const name = inv.panel_profile?.[0]?.name
-
-              return (
-                <div key={inv.id} className="flex items-center justify-between py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text">
-                      {name ? `${name} · ` : ''}{inv.phone}
-                    </p>
-                    <p className="text-xs text-text-muted mt-0.5">
-                      {new Date(inv.invited_at).toLocaleDateString('ko-KR')} 초대
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sl.color}`}>
-                      {sl.text}
-                    </span>
-                    {inv.status === 'accepted' && (
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${responded ? 'text-go bg-go-bg' : 'text-gray-400 bg-gray-100'}`}>
-                        {responded ? '응답 완료' : '미응답'}
-                      </span>
-                    )}
-                    {inv.status === 'pending' && (
-                      <button onClick={() => handleResend(inv.phone)} className="text-xs text-navy hover:underline">
-                        재발송
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
     </div>
   )
 }
