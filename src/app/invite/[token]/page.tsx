@@ -8,7 +8,7 @@ import Button from '@/components/ui/Button'
 interface InvitationData {
   id: string
   token: string
-  email: string
+  phone: string
   status: string
   expires_at: string
   project: { id: string; product_name: string; product_category: string }
@@ -22,20 +22,13 @@ export default function InviteTokenPage() {
   const clientId = searchParams.get('client') ?? undefined
   const supabase = createClient()
 
-  const [step, setStep] = useState<'loading' | 'info' | 'auth' | 'done' | 'error'>('loading')
+  const [step, setStep] = useState<'loading' | 'ready' | 'accepting' | 'done' | 'error'>('loading')
   const [invitation, setInvitation] = useState<InvitationData | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // 회원가입 폼
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup')
-  const [submitting, setSubmitting] = useState(false)
-  const [authError, setAuthError] = useState('')
-
   useEffect(() => {
-    async function validateToken() {
+    async function init() {
+      // 1. 토큰 검증
       const res = await fetch(`/api/invite/accept?token=${token}`)
       const data = await res.json()
 
@@ -45,26 +38,27 @@ export default function InviteTokenPage() {
         return
       }
 
-      setInvitation(data.invitation)
+      const inv: InvitationData = data.invitation
+      setInvitation(inv)
 
-      // 이미 로그인된 경우 바로 수락 처리
+      // 2. 이미 로그인된 사용자 → 바로 수락
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        await acceptInvitation(user.id, data.invitation)
+        setStep('accepting')
+        await acceptInvitation(user.id, inv)
         return
       }
 
-      setStep('info')
+      // 3. 비로그인 → localStorage에 invite 정보 저장 후 회원가입으로 이동
+      localStorage.setItem('pending_invite', JSON.stringify({ token, clientId }))
+      setStep('ready')
     }
 
-    validateToken()
+    init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  async function acceptInvitation(panelId: string, inv?: InvitationData) {
-    const inv_ = inv || invitation
-    if (!inv_) return
-
+  async function acceptInvitation(panelId: string, inv: InvitationData) {
     const res = await fetch('/api/invite/accept', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -79,79 +73,34 @@ export default function InviteTokenPage() {
     }
 
     setStep('done')
-    // 잠시 후 설문 이동
     setTimeout(() => {
       if (data.surveyId) {
         router.push(`/panel/surveys/${data.surveyId}`)
       } else {
         router.push('/panel/dashboard')
       }
-    }, 2000)
+    }, 1500)
   }
 
-  async function handleAuth(e: React.FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    setAuthError('')
-
-    try {
-      if (authMode === 'signup') {
-        const { data: authData, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { role: 'panel', full_name: name },
-          },
-        })
-        if (error) throw error
-
-        const userId = authData.user?.id
-        if (!userId) throw new Error('가입 처리 중 오류가 발생했습니다')
-
-        // 패널 프로필 기본 생성
-        await supabase.from('panel_profiles').upsert({
-          id: userId,
-          full_name: name,
-          panel_type: 'invited',
-          terms_agreed_at: new Date().toISOString(),
-        }, { onConflict: 'id', ignoreDuplicates: false })
-
-        // profiles 역할 설정
-        await supabase.from('profiles').upsert({
-          id: userId,
-          email,
-          role: 'panel',
-        }, { onConflict: 'id', ignoreDuplicates: false })
-
-        await acceptInvitation(userId)
-      } else {
-        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
-
-        const userId = authData.user?.id
-        if (!userId) throw new Error('로그인 처리 중 오류가 발생했습니다')
-
-        await acceptInvitation(userId)
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '처리 중 오류가 발생했습니다'
-      setAuthError(message)
-    } finally {
-      setSubmitting(false)
-    }
+  function goToRegister() {
+    router.push('/register?role=panel')
   }
 
-  if (step === 'loading') {
+  // ── 로딩 ────────────────────────────────────────────────
+  if (step === 'loading' || step === 'accepting') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-navy border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">초대 링크 확인 중...</p>
+          <p className="text-gray-500 text-sm">
+            {step === 'accepting' ? '초대 수락 중...' : '초대 링크 확인 중...'}
+          </p>
         </div>
       </div>
     )
   }
 
+  // ── 오류 ────────────────────────────────────────────────
   if (step === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -169,6 +118,7 @@ export default function InviteTokenPage() {
     )
   }
 
+  // ── 완료 ────────────────────────────────────────────────
   if (step === 'done') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -183,13 +133,13 @@ export default function InviteTokenPage() {
     )
   }
 
-  // step === 'info' or 'auth'
+  // ── 회원가입 안내 (step === 'ready') ────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full">
+      <div className="max-w-sm w-full">
         {/* 초대 정보 카드 */}
         {invitation && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-navy/10 flex items-center justify-center flex-shrink-0">
                 <span className="text-navy text-lg">💌</span>
@@ -200,101 +150,36 @@ export default function InviteTokenPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">
-              <span className="font-medium text-gray-800">{invitation.project.product_name}</span> 제품 테스트 패널로 초대받으셨습니다.
-              아래에서 간편하게 참여하고 설문에 응답해주세요.
+              <span className="font-medium text-gray-800">{invitation.project.product_name}</span> 제품 테스트 패널로
+              초대받으셨습니다. 아래 버튼을 눌러 패널 회원가입을 완료하면 설문에 참여할 수 있습니다.
             </p>
             {invitation.survey && (
               <div className="mt-3 px-3 py-2 bg-gray-50 rounded-lg">
-                <p className="text-xs text-gray-500">설문: <span className="font-medium text-gray-700">{invitation.survey.title}</span></p>
+                <p className="text-xs text-gray-500">
+                  설문: <span className="font-medium text-gray-700">{invitation.survey.title}</span>
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* 인증 폼 */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          {/* 탭 */}
-          <div className="flex gap-2 mb-6">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+          <p className="text-sm text-gray-600 mb-5 leading-relaxed">
+            나들목 패널로 가입하고 제품 테스트에 참여하세요.<br />
+            회원가입 완료 후 초대가 자동으로 수락됩니다.
+          </p>
+          <Button onClick={goToRegister} className="w-full">
+            패널 회원가입 하기
+          </Button>
+          <p className="mt-3 text-xs text-gray-400">
+            이미 계정이 있으신가요?{' '}
             <button
-              onClick={() => { setAuthMode('signup'); setAuthError('') }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                authMode === 'signup'
-                  ? 'bg-navy text-white'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
+              onClick={() => router.push(`/login?next=/invite/${token}${clientId ? `?client=${clientId}` : ''}`)}
+              className="text-navy underline"
             >
-              처음 참여하기
+              로그인
             </button>
-            <button
-              onClick={() => { setAuthMode('login'); setAuthError('') }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                authMode === 'login'
-                  ? 'bg-navy text-white'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              기존 계정으로 참여
-            </button>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            {authMode === 'signup' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">이름</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  placeholder="홍길동"
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-colors"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">이메일</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="your@email.com"
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">비밀번호</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder={authMode === 'signup' ? '6자리 이상' : '비밀번호 입력'}
-                minLength={authMode === 'signup' ? 6 : undefined}
-                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-colors"
-              />
-            </div>
-
-            {authError && (
-              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{authError}</p>
-            )}
-
-            <Button type="submit" loading={submitting} className="w-full">
-              {authMode === 'signup' ? '참여하기' : '로그인 후 참여하기'}
-            </Button>
-          </form>
-
-          {authMode === 'signup' && (
-            <p className="mt-4 text-xs text-gray-400 text-center leading-relaxed">
-              참여 시 나들목의{' '}
-              <a href="/terms/service" className="text-navy underline" target="_blank" rel="noopener noreferrer">이용약관</a>
-              {' '}및{' '}
-              <a href="/terms/privacy" className="text-navy underline" target="_blank" rel="noopener noreferrer">개인정보처리방침</a>
-              에 동의하는 것으로 간주됩니다.
-            </p>
-          )}
+          </p>
         </div>
       </div>
     </div>

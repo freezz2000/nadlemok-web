@@ -201,6 +201,27 @@ export default function PanelProfilePage() {
         return
       }
 
+      // 초대 링크를 통해 가입한 경우 — 초대 자동 수락
+      try {
+        const pendingInvite = localStorage.getItem('pending_invite')
+        if (pendingInvite) {
+          const { token, clientId } = JSON.parse(pendingInvite) as { token: string; clientId?: string }
+          const invRes = await fetch('/api/invite/accept', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, panelId: user.id, clientId }),
+          })
+          localStorage.removeItem('pending_invite')
+          if (invRes.ok) {
+            const invData = await invRes.json()
+            if (invData.surveyId) {
+              router.push(`/panel/surveys/${invData.surveyId}`)
+              return
+            }
+          }
+        }
+      } catch { /* invite 수락 실패해도 가입은 완료 */ }
+
       router.push('/panel')
     } catch (err) {
       console.error('handleSubmit exception:', err)
