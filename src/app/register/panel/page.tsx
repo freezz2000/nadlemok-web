@@ -203,6 +203,7 @@ export default function PanelProfilePage() {
 
       // 초대 링크를 통해 가입한 경우 — 초대 자동 수락
       try {
+        // phone-based 초대 (/invite/[token])
         const pendingInvite = localStorage.getItem('pending_invite')
         if (pendingInvite) {
           const { token, clientId } = JSON.parse(pendingInvite) as { token: string; clientId?: string }
@@ -216,6 +217,25 @@ export default function PanelProfilePage() {
             const invData = await invRes.json()
             if (invData.surveyId) {
               router.push(`/panel/surveys/${invData.surveyId}`)
+              return
+            }
+          }
+        }
+
+        // project-level 초대 (/invite/p/[token])
+        const pendingProject = localStorage.getItem('pending_invite_project')
+        if (pendingProject) {
+          const { projectToken, clientId } = JSON.parse(pendingProject) as { projectToken: string; clientId?: string }
+          const projRes = await fetch('/api/invite/accept-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectToken, panelId: user.id, clientId }),
+          })
+          localStorage.removeItem('pending_invite_project')
+          if (projRes.ok) {
+            const projData = await projRes.json()
+            if (projData.surveyId) {
+              router.push(`/panel/surveys/${projData.surveyId}`)
               return
             }
           }

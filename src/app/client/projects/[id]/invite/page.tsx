@@ -64,7 +64,12 @@ export default function InvitePage() {
   const [sendingPool, setSendingPool] = useState(false)
   const [poolResult, setPoolResult] = useState<{ success: number; failed: number } | null>(null)
 
-  // 링크 직접 생성
+  // 프로젝트 단위 초대 링크
+  const [projectInviteLink, setProjectInviteLink] = useState<string>('')
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [loadingLink, setLoadingLink] = useState(false)
+
+  // 링크 직접 생성 (phone-based)
   const [generatingLinks, setGeneratingLinks] = useState(false)
   const [generatedLinks, setGeneratedLinks] = useState<{ phone: string; url: string }[]>([])
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
@@ -78,6 +83,16 @@ export default function InvitePage() {
       .eq('id', projectId)
       .single()
     if (proj) setProductName(proj.product_name)
+
+    // 프로젝트 초대 링크 로드
+    if (!projectInviteLink) {
+      setLoadingLink(true)
+      fetch(`/api/invite/project-link?projectId=${projectId}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.url) setProjectInviteLink(d.url) })
+        .catch(() => {})
+        .finally(() => setLoadingLink(false))
+    }
 
     // 설문 로드
     const { data: surveys } = await supabase
@@ -180,6 +195,14 @@ export default function InvitePage() {
       else next.add(panelId)
       return next
     })
+  }
+
+  // ── 프로젝트 초대 링크 복사 ───────────────────────────
+  async function handleCopyProjectLink() {
+    if (!projectInviteLink) return
+    await navigator.clipboard.writeText(projectInviteLink)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
   }
 
   // ── 링크만 생성 (알림톡 없이) ─────────────────────────
@@ -379,6 +402,41 @@ export default function InvitePage() {
           {productName && <p className="text-sm text-text-muted mt-0.5">{productName}</p>}
         </div>
       </div>
+
+      {/* ── 프로젝트 초대 링크 ───────────────────────────── */}
+      <Card className="mb-6 border-navy/20 bg-navy/[0.02]">
+        <CardTitle>초대 링크</CardTitle>
+        <p className="text-sm text-text-muted mt-1 mb-3">
+          이 링크를 직원들에게 공유하세요. 링크를 클릭하면 패널로 가입하고 바로 설문에 참여할 수 있습니다.
+        </p>
+        {loadingLink ? (
+          <div className="flex items-center gap-2 text-xs text-text-muted py-2">
+            <div className="w-4 h-4 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+            링크 생성 중...
+          </div>
+        ) : projectInviteLink ? (
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={projectInviteLink}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 px-3 py-2 text-xs font-mono bg-white border border-gray-200 rounded-lg text-navy truncate outline-none focus:ring-2 focus:ring-navy/20 min-w-0"
+            />
+            <button
+              onClick={handleCopyProjectLink}
+              className={`flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                linkCopied
+                  ? 'bg-go text-white'
+                  : 'bg-navy text-white hover:bg-navy/90'
+              }`}
+            >
+              {linkCopied ? '복사됨 ✓' : '복사'}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-text-muted">링크를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.</p>
+        )}
+      </Card>
 
       {/* 현황 요약 */}
       <div className="grid grid-cols-4 gap-3 mb-6">
