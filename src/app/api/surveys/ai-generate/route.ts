@@ -136,7 +136,7 @@ ${category ? `카테고리: ${category}` : ''}
 - "text": 주관식 서술형 (scale·scaleLabels 없음)
 - "choice": 객관식 선택형 (choices 배열 필수)
 
-아래 JSON 형식으로만 응답하세요 (마크다운 코드블록 없이 순수 JSON):
+아래 JSON 형식으로만 응답하세요 (마크다운 코드블록·설명 텍스트 없이, 순수 JSON 배열만 출력):
 
 [
   {
@@ -167,13 +167,41 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
 
     const raw = (message.content[0] as { type: string; text: string }).text.trim()
 
-    // JSON 파싱
+    // JSON 파싱 — 여러 형식 시도
     let questions
-    try {
-      questions = JSON.parse(raw)
-    } catch {
-      const cleaned = raw.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim()
-      questions = JSON.parse(cleaned)
+    const parseAttempts = [
+      // 1) 직접 파싱
+      () => JSON.parse(raw),
+      // 2) ```json ... ``` 또는 ``` ... ``` 마크다운 코드블록 제거
+      () => JSON.parse(raw.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()),
+      // 3) 텍스트 내에서 JSON 배열 추출 (첫 번째 [ ... ] 블록)
+      () => {
+        const m = raw.match(/\[[\s\S]*\]/)
+        if (!m) throw new SyntaxError('no JSON array found')
+        return JSON.parse(m[0])
+      },
+      // 4) 텍스트 내에서 JSON 객체 추출 후 배열로 감싸기
+      () => {
+        const m = raw.match(/\{[\s\S]*\}/)
+        if (!m) throw new SyntaxError('no JSON object found')
+        const obj = JSON.parse(m[0])
+        return Array.isArray(obj) ? obj : [obj]
+      },
+    ]
+
+    let lastErr: Error = new SyntaxError('parse failed')
+    for (const attempt of parseAttempts) {
+      try {
+        questions = attempt()
+        break
+      } catch (e) {
+        lastErr = e as Error
+      }
+    }
+
+    if (questions === undefined) {
+      console.error('[ai-generate] all parse attempts failed. raw:', raw.slice(0, 500))
+      throw lastErr
     }
 
     if (!Array.isArray(questions)) {
