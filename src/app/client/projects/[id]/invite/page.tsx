@@ -180,14 +180,11 @@ export default function InvitePage() {
       setLinkPanels([])
     }
 
-    // ── survey_panels: 응답여부 + 배정 현황 추적 전용 (링크 패널 소스로는 사용 안 함)
+    // ── survey_panels: API 경유 조회 (클라이언트 RLS에 SELECT 정책 없음 → service role 우회)
     if (survey?.id) {
-      const { data: surveyPanels } = await supabase
-        .from('survey_panels')
-        .select('panel_id, status')
-        .eq('survey_id', survey.id)
-
-      const rows = (surveyPanels as SurveyPanelRow[]) || []
+      const spRes = await fetch(`/api/surveys/assign-panels?surveyId=${survey.id}`)
+      const spData = spRes.ok ? await spRes.json() as { panels: SurveyPanelRow[] } : { panels: [] }
+      const rows = spData.panels
 
       const responseM: Record<string, boolean> = {}
       const assignedIds = new Set<string>()
@@ -294,7 +291,10 @@ export default function InvitePage() {
 
   // 패널 선택 저장
   async function handleSaveAssignment() {
-    if (!surveyId) return
+    if (!surveyId) {
+      setStartError('설문이 아직 없습니다. 프로젝트 페이지에서 설문을 먼저 생성해주세요.')
+      return
+    }
     setSavingAssignment(true)
     setAssignSaved(false)
     const toAdd = [...selectedAssignment].filter((id) => !assignedPanelIds.has(id))
@@ -708,18 +708,23 @@ export default function InvitePage() {
               })}
             </div>
 
-            <div className="mt-4 flex items-center gap-3">
-              <Button
-                onClick={handleSaveAssignment}
-                loading={savingAssignment}
-                disabled={!assignmentChanged}
-                size="sm"
-              >
-                패널 선택 저장
-              </Button>
-              {assignSaved && <p className="text-xs text-go">저장됐습니다</p>}
-              {assignmentChanged && !assignSaved && (
-                <p className="text-xs text-amber-600">저장되지 않은 변경사항이 있습니다</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleSaveAssignment}
+                  loading={savingAssignment}
+                  disabled={!assignmentChanged}
+                  size="sm"
+                >
+                  패널 선택 저장
+                </Button>
+                {assignSaved && <p className="text-xs text-go">저장됐습니다 ✓</p>}
+                {assignmentChanged && !assignSaved && (
+                  <p className="text-xs text-amber-600">저장되지 않은 변경사항이 있습니다</p>
+                )}
+              </div>
+              {startError && (
+                <p className="text-xs text-nogo">{startError}</p>
               )}
             </div>
           </>

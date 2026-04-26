@@ -6,6 +6,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// GET: survey_panels 조회 (클라이언트 RLS 우회용 — survey_panels에 클라이언트 SELECT 정책 없음)
+export async function GET(req: NextRequest) {
+  const surveyId = req.nextUrl.searchParams.get('surveyId')
+  if (!surveyId) return NextResponse.json({ panels: [] })
+
+  const { data, error } = await supabase
+    .from('survey_panels')
+    .select('panel_id, status')
+    .eq('survey_id', surveyId)
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ panels: data ?? [] })
+}
+
 // POST: survey_panels 에 패널 추가 / 제거
 export async function POST(req: NextRequest) {
   try {
