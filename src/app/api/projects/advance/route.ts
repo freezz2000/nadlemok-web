@@ -33,6 +33,25 @@ export async function POST(req: NextRequest) {
     if (project.client_id !== user.id) return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
     if (project.status !== 'draft') return NextResponse.json({ error: '설문 설정 단계에서만 진행할 수 있습니다.' }, { status: 409 })
 
+    // ── 설문 문항 존재 여부 서버 사이드 검증 ─────────────────────────────
+    // 내부/외부 모두 설문이 없거나 문항이 0개면 테스트를 시작할 수 없음
+    const { data: survey } = await admin
+      .from('surveys')
+      .select('id, questions')
+      .eq('project_id', projectId)
+      .maybeSingle()
+
+    const questionCount = Array.isArray((survey as { questions?: unknown[] } | null)?.questions)
+      ? ((survey as { questions: unknown[] }).questions).length
+      : 0
+
+    if (!survey || questionCount === 0) {
+      return NextResponse.json(
+        { error: '설문 문항을 먼저 설정해주세요. 설문이 없거나 문항이 없으면 테스트를 시작할 수 없습니다.' },
+        { status: 422 }
+      )
+    }
+
     const isInternal = project.panel_source === 'internal'
     const nextStatus = isInternal ? 'testing' : 'matching'
 
