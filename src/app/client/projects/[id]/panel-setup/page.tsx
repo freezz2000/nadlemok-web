@@ -2,37 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 import {
   AGE_RANGE_OPTIONS,
   SKIN_TYPE_OPTIONS,
   SKIN_CONCERN_OPTIONS,
-  calculateQuote,
-  getQuoteBreakdown,
-  formatKRW,
 } from '@/lib/pricing'
 
 type PanelSource = 'internal' | 'external'
-
-const SUBSCRIPTION_PLANS = [
-  {
-    key: 'starter',
-    name: 'Starter',
-    priceLabel: '29,000원/월',
-    credits: 100,
-    desc: '외부 패널 30명 × 3회 검증 가능',
-  },
-  {
-    key: 'growth',
-    name: 'Growth',
-    priceLabel: '49,000원/월',
-    credits: 300,
-    desc: '외부 패널 50명 × 6회 검증 가능',
-    badge: '인기',
-  },
-]
 
 export default function PanelSetupPage() {
   const { id: projectId } = useParams<{ id: string }>()
@@ -104,13 +82,6 @@ export default function PanelSetupPage() {
     }
     load().catch(() => {})
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 크레딧 충분 여부
-  const creditsNeeded = selected === 'external' ? externalCount : 0
-  const hasEnoughCredits = creditBalance !== null && creditBalance >= creditsNeeded
-
-  const quote = selected === 'external' ? calculateQuote(externalCount, deliveryService) : null
-  const breakdown = selected === 'external' ? getQuoteBreakdown(externalCount, deliveryService) : null
 
   function toggleItem(arr: string[], val: string, setter: (v: string[]) => void) {
     setter(arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
@@ -403,7 +374,7 @@ export default function PanelSetupPage() {
               <p className="font-medium text-text text-sm">샘플 배송 대행 신청</p>
               <p className="text-xs text-text-muted mt-0.5">
                 고객사 → 나들목 → 패널로 소분 배송
-                <span className="ml-2 text-amber-600 font-medium">+{formatKRW(1_000)}/인</span>
+                <span className="ml-2 text-amber-600 font-medium">+1,000원/인</span>
               </p>
               <p className="text-xs text-text-muted mt-0.5">
                 미선택 시 패널 주소 목록 제공 · 고객사 직접 발송
@@ -411,84 +382,7 @@ export default function PanelSetupPage() {
             </div>
           </label>
 
-          {/* 예상 견적 */}
-          {quote !== null && breakdown && (
-            <div className="bg-white rounded-xl border border-gold/30 p-4">
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">예상 견적</p>
-              <div className="space-y-1.5">
-                {breakdown.items.map((item, i) => (
-                  <div key={i}>
-                    <div className="flex justify-between text-sm py-0.5">
-                      <span className="text-text-muted">{item.label}</span>
-                      <span className="font-medium text-text">{formatKRW(item.amount)}</span>
-                    </div>
-                    {item.sub.map((s, j) => (
-                      <div key={j} className="flex justify-between text-xs py-0.5 pl-3 text-text-muted/70">
-                        <span>└ {s.label}</span>
-                        <span>{formatKRW(s.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-gold/30 mt-3 pt-3 flex justify-between items-center">
-                <span className="font-bold text-navy text-sm">합계</span>
-                <span className="font-bold text-navy text-xl">{formatKRW(breakdown.total)}</span>
-              </div>
-              <p className="text-xs text-text-muted mt-1.5">* VAT 별도</p>
-            </div>
-          )}
-
-          {/* 크레딧 잔액 확인 */}
-          <div className={`rounded-xl border p-4 ${hasEnoughCredits ? 'border-go/30 bg-go/5' : 'border-nogo/30 bg-nogo/5'}`}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-semibold text-text">크레딧 잔액</span>
-              <span className={`text-xl font-black ${hasEnoughCredits ? 'text-go' : 'text-nogo'}`}>
-                {creditBalance ?? '—'} <span className="text-sm font-normal">cr</span>
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-text-muted">
-              <span>이번 검증에 필요한 크레딧</span>
-              <span className="font-semibold">{creditsNeeded} cr</span>
-            </div>
-            {!hasEnoughCredits && creditBalance !== null && (
-              <p className="text-xs text-nogo mt-1.5 font-medium">
-                {creditsNeeded - creditBalance}cr 부족합니다. 구독을 시작하면 크레딧이 즉시 충전됩니다.
-              </p>
-            )}
-          </div>
-
-          {/* 크레딧 부족 시 구독 플랜 카드 */}
-          {!hasEnoughCredits && creditBalance !== null && (
-            <div>
-              <p className="text-sm font-semibold text-text mb-3">구독 플랜 선택</p>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                {SUBSCRIPTION_PLANS.map((p) => (
-                  <Link
-                    key={p.key}
-                    href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
-                    className="relative block text-left p-4 rounded-xl border-2 border-border bg-white hover:border-navy/40 transition-all"
-                  >
-                    {p.badge && (
-                      <span className="absolute -top-2 right-3 text-xs px-2 py-0.5 bg-gold text-navy font-bold rounded-full">
-                        {p.badge}
-                      </span>
-                    )}
-                    <p className="font-bold text-text">{p.name}</p>
-                    <p className="text-navy font-semibold text-sm mt-0.5">{p.priceLabel}</p>
-                    <p className="text-xs text-text-muted mt-0.5">{p.credits}cr/월</p>
-                    <p className="text-xs text-text-muted mt-2 leading-relaxed">{p.desc}</p>
-                  </Link>
-                ))}
-              </div>
-              <Link
-                href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
-                className="block w-full text-center py-3 rounded-xl bg-navy text-white font-semibold text-sm hover:bg-navy/90 transition-colors"
-              >
-                구독 시작하기 — 크레딧 즉시 충전
-              </Link>
-            </div>
-          )}
+          {/* 예상 견적 / 크레딧 / 구독 플랜 — 숨김 처리 */}
         </div>
       )}
 
@@ -501,12 +395,12 @@ export default function PanelSetupPage() {
       <Button
         onClick={handleConfirm}
         loading={saving}
-        disabled={!selected || (selected === 'external' && !hasEnoughCredits)}
+        disabled={!selected}
         className="w-full"
         size="lg"
       >
         {selected === 'external'
-          ? (hasEnoughCredits ? `다음 — 패널 선택하기 (${creditsNeeded}cr 사용)` : '크레딧이 부족합니다')
+          ? '다음 — 패널 선택하기'
           : selected === 'internal'
             ? '시작하기 — 설문 설정으로'
             : '방식을 선택해주세요'}
