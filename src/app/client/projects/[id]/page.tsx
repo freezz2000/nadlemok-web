@@ -54,6 +54,26 @@ export default function ClientProjectDetailPage() {
   const [testingSurveyInfo, setTestingSurveyInfo] = useState<{ id: string; status: string; questions_count: number } | null>(null)
   const [endingTest, setEndingTest] = useState(false)
 
+  // 패널 응답 결과 (completed / analyzing)
+  interface PanelResponseItem {
+    panel_id: string; name: string; status: string; matched_at: string
+    has_responded: boolean; answered_count: number; total_questions: number
+    avg_score: number | null
+    response: {
+      responses: Record<string, number | string>  // scale: number, choice: string
+      open_weakness: string | null; open_improvement: string | null
+      responded_at: string | null; response_duration_sec: number | null
+    } | null
+  }
+  interface ResponseReport {
+    questions: SurveyQuestion[]
+    panels: PanelResponseItem[]
+    total_questions: number
+  }
+  const [responseReport, setResponseReport] = useState<ResponseReport | null>(null)
+  const [expandedRespPanelId, setExpandedRespPanelId] = useState<string | null>(null)
+  const [detailPanelId, setDetailPanelId] = useState<string | null>(null)
+
   useEffect(() => { load() }, [id])
 
   async function load() {
@@ -98,6 +118,15 @@ export default function ClientProjectDetailPage() {
         setTestingPanels(data.panels || [])
         setTestingRespondedCount(data.responded_count ?? 0)
         setTestingSurveyInfo(data.survey ?? null)
+      }
+    }
+
+    // completed / analyzing 상태: 패널 응답 결과 로드
+    if (proj?.status === 'completed' || proj?.status === 'analyzing') {
+      const res = await fetch(`/api/projects/${id}/panel-responses`)
+      if (res.ok) {
+        const data = await res.json()
+        setResponseReport(data)
       }
     }
   }
@@ -586,6 +615,253 @@ export default function ClientProjectDetailPage() {
           )}
         </Card>
       )}
+
+      {/* === completed / analyzing 상태: 패널 응답 결과 === */}
+      {(isCompleted || isAnalyzing) && responseReport && responseReport.panels.length > 0 && (
+        <Card className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle>패널 응답 결과</CardTitle>
+            <span className="text-xs text-text-muted">
+              {responseReport.panels.filter(p => p.has_responded).length} / {responseReport.panels.length}명 응답 완료
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {responseReport.panels.map((panel) => (
+              <div key={panel.panel_id} className="border border-border rounded-xl overflow-hidden">
+                {/* 토글 헤더 행 */}
+                <button
+                  type="button"
+                  onClick={() => setExpandedRespPanelId(
+                    expandedRespPanelId === panel.panel_id ? null : panel.panel_id
+                  )}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface/50 transition-colors text-left"
+                >
+                  {/* 펼치기 아이콘 */}
+                  <svg
+                    className={`w-4 h-4 text-text-muted flex-shrink-0 transition-transform ${expandedRespPanelId === panel.panel_id ? 'rotate-180' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+
+                  {/* 패널명 */}
+                  <span className="flex-1 text-sm font-medium text-text">{panel.name}</span>
+
+                  {/* 응답 수 */}
+                  <span className="text-xs text-text-muted tabular-nums mr-1">
+                    {panel.has_responded
+                      ? `${panel.answered_count} / ${panel.total_questions}문항`
+                      : '미응답'}
+                  </span>
+
+                  {/* 상태 배지 */}
+                  {panel.has_responded ? (
+                    <span className="text-xs font-medium text-go bg-go-bg px-2 py-0.5 rounded-full flex-shrink-0">응답 완료</span>
+                  ) : (
+                    <span className="text-xs font-medium text-text-muted bg-surface-dark px-2 py-0.5 rounded-full flex-shrink-0">미응답</span>
+                  )}
+
+                  {/* 상세 버튼 */}
+                  {panel.has_responded && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDetailPanelId(panel.panel_id) }}
+                      className="ml-2 flex-shrink-0 text-xs px-3 py-1 bg-navy text-white rounded-lg hover:bg-navy/80 transition-colors"
+                    >
+                      상세
+                    </button>
+                  )}
+                </button>
+
+                {/* 펼쳐진 요약 */}
+                {expandedRespPanelId === panel.panel_id && panel.has_responded && panel.response && (
+                  <div className="px-4 py-3 border-t border-border/50 bg-surface/30">
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-xs text-text-muted mb-0.5">평균 점수</p>
+                        <p className="text-lg font-bold text-navy">
+                          {panel.avg_score != null ? `${panel.avg_score.toFixed(2)}점` : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-text-muted mb-0.5">응답 소요시간</p>
+                        <p className="text-lg font-bold text-text">
+                          {panel.response.response_duration_sec != null
+                            ? `${Math.round(panel.response.response_duration_sec / 60)}분 ${panel.response.response_duration_sec % 60}초`
+                            : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-text-muted mb-0.5">응답일</p>
+                        <p className="text-sm font-medium text-text">
+                          {panel.response.responded_at
+                            ? new Date(panel.response.responded_at).toLocaleDateString('ko-KR')
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDetailPanelId(panel.panel_id)}
+                      className="mt-3 w-full text-xs text-navy hover:underline"
+                    >
+                      문항별 상세 답변 보기 →
+                    </button>
+                  </div>
+                )}
+                {expandedRespPanelId === panel.panel_id && !panel.has_responded && (
+                  <div className="px-4 py-3 border-t border-border/50 bg-surface/30">
+                    <p className="text-xs text-text-muted text-center">아직 설문에 응답하지 않았습니다.</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* === 상세 응답 모달 === */}
+      {detailPanelId && (() => {
+        const panel = responseReport?.panels.find(p => p.panel_id === detailPanelId)
+        if (!panel || !panel.response) return null
+        const { responses, open_weakness, open_improvement } = panel.response
+        const qs = responseReport!.questions
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setDetailPanelId(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 모달 헤더 */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+                <div>
+                  <h2 className="text-base font-bold text-text">{panel.name} — 응답 상세</h2>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    평균 {panel.avg_score != null ? `${panel.avg_score.toFixed(2)}점` : '-'} · {panel.answered_count}/{panel.total_questions}문항 응답
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailPanelId(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface text-text-muted hover:text-text transition-colors text-lg"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* 모달 바디 */}
+              <div className="overflow-y-auto flex-1 px-6 py-4">
+                <div className="space-y-2">
+                  {qs.map((q, i) => {
+                    if (q.type === 'scale') {
+                      const score = responses[q.key] as number | undefined
+                      const scoreLabel = (score != null && q.scaleLabels) ? q.scaleLabels[score - 1] : null
+                      const isKs = q.isKillSignal
+                      const scoreColor = score == null ? 'text-text-muted' :
+                        score >= 3 ? 'text-go' : score === 2 ? 'text-cgo' : 'text-nogo'
+
+                      return (
+                        <div
+                          key={q.key}
+                          className={`flex items-start gap-3 p-3 rounded-lg ${isKs ? 'bg-nogo-bg/30 border border-nogo/10' : 'bg-surface'}`}
+                        >
+                          <span className="text-xs text-text-muted w-5 flex-shrink-0 pt-0.5 tabular-nums">{i + 1}.</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-text leading-snug">{q.label || '(내용 없음)'}</p>
+                            {score != null ? (
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className={`text-xl font-black ${scoreColor}`}>{score}점</span>
+                                {scoreLabel && (
+                                  <span className="text-xs text-text-muted">{scoreLabel}</span>
+                                )}
+                                {/* 점수 바 */}
+                                <div className="flex-1 h-1.5 bg-surface-dark rounded-full overflow-hidden max-w-[80px]">
+                                  <div
+                                    className={`h-full rounded-full ${score >= 3 ? 'bg-go' : score === 2 ? 'bg-cgo' : 'bg-nogo'}`}
+                                    style={{ width: `${(score / 4) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-text-muted mt-1">응답 없음</p>
+                            )}
+                          </div>
+                          {isKs && (
+                            <span className="text-xs px-1.5 py-0.5 bg-nogo-bg text-nogo rounded font-medium flex-shrink-0">KS</span>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (q.type === 'choice') {
+                      const chosen = responses[q.key] as string | undefined
+                      return (
+                        <div key={q.key} className="flex items-start gap-3 p-3 rounded-lg bg-surface">
+                          <span className="text-xs text-text-muted w-5 flex-shrink-0 pt-0.5 tabular-nums">{i + 1}.</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-text leading-snug">{q.label || '(내용 없음)'}</p>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {(q.choices || []).map((ch) => (
+                                <span
+                                  key={ch}
+                                  className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                                    chosen === ch
+                                      ? 'bg-navy text-white border-navy'
+                                      : 'bg-white text-text-muted border-border'
+                                  }`}
+                                >
+                                  {ch}
+                                </span>
+                              ))}
+                              {chosen == null && (
+                                <p className="text-xs text-text-muted mt-0.5">응답 없음</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })}
+
+                  {/* 주관식: 아쉬운 점 */}
+                  {open_weakness && (
+                    <div className="p-3 bg-surface rounded-lg border border-border/50">
+                      <p className="text-xs font-semibold text-text-muted mb-1.5">💬 아쉬운 점 · 불편했던 점</p>
+                      <p className="text-sm text-text leading-relaxed">{open_weakness}</p>
+                    </div>
+                  )}
+
+                  {/* 주관식: 개선사항 */}
+                  {open_improvement && (
+                    <div className="p-3 bg-surface rounded-lg border border-border/50">
+                      <p className="text-xs font-semibold text-text-muted mb-1.5">✏️ 개선 · 추가 요청사항</p>
+                      <p className="text-sm text-text leading-relaxed">{open_improvement}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 모달 푸터 */}
+              <div className="px-6 py-3 border-t border-border flex-shrink-0 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDetailPanelId(null)}
+                  className="px-4 py-2 text-sm text-text-muted hover:text-text border border-border rounded-lg hover:bg-surface transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* === draft 상태: 설문 편집 === */}
       {isDraft && (

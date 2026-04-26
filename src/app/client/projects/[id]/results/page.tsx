@@ -192,6 +192,7 @@ export default function ResultsPage() {
   const [productName, setProductName] = useState('')
   const [panelSize, setPanelSize] = useState(0)
   const [satThreshold, setSatThreshold] = useState(3.0)
+  const [panelSource, setPanelSource] = useState<'internal' | 'external' | 'mixed'>('internal')
   const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => { load() }, [id])
@@ -202,12 +203,13 @@ export default function ResultsPage() {
 
     const [{ data: analysis }, { data: project }] = await Promise.all([
       supabase.from('analysis_results').select('*').eq('project_id', id).single(),
-      supabase.from('projects').select('product_name, panel_size, satisfaction_threshold').eq('id', id).single(),
+      supabase.from('projects').select('product_name, panel_size, satisfaction_threshold, panel_source').eq('id', id).single(),
     ])
     setResult(analysis)
     setProductName(project?.product_name || '')
     setPanelSize(project?.panel_size || 50)
     setSatThreshold(project?.satisfaction_threshold ?? 3.0)
+    setPanelSource((project?.panel_source as 'internal' | 'external' | 'mixed') || 'internal')
 
   }
 
@@ -224,6 +226,8 @@ export default function ResultsPage() {
   }
 
   const vc = VERDICT_CONFIG[result.verdict] ?? VERDICT_CONFIG['CONDITIONAL GO']
+  // 외부 패널(또는 혼합) 프로젝트만 고급 통계 분석 섹션 노출
+  const isExternalPanel = panelSource === 'external' || panelSource === 'mixed'
   const n = result.summary.total_responses
   const satMean = result.summary.satisfaction_mean ?? 0
   const recMean = result.summary.recommend_mean ?? 0
@@ -309,7 +313,7 @@ export default function ResultsPage() {
               </div>
               <div className="bg-white/70 rounded-xl p-3 text-center">
                 <p className="text-xs text-text-muted mb-0.5">출시 성공 확률</p>
-                <p className={`text-2xl font-black ${vc.text}`}>{Math.round(result.success_probability * 100)}%</p>
+                <p className={`text-2xl font-black ${vc.text}`}>{Math.round(result.success_probability)}%</p>
                 <p className="text-xs text-text-muted">종합 모델</p>
               </div>
             </div>
@@ -483,9 +487,9 @@ export default function ResultsPage() {
       )}
 
       {/* ════════════════════════════════════════════════
-          섹션 5 : 핵심 기여 요인 (Key Drivers)
+          섹션 5 : 핵심 기여 요인 (Key Drivers) — 외부 패널 전용
       ════════════════════════════════════════════════ */}
-      {hasDrivers && (
+      {isExternalPanel && hasDrivers && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="3단계 · 피어슨 상관관계 분석"
@@ -523,9 +527,9 @@ export default function ResultsPage() {
       )}
 
       {/* ════════════════════════════════════════════════
-          섹션 6 : 코호트 분석
+          섹션 6 : 코호트 분석 — 외부 패널 전용
       ════════════════════════════════════════════════ */}
-      {hasCohort && (
+      {isExternalPanel && hasCohort && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="4단계 · 코호트별 심층 분석"
@@ -605,9 +609,9 @@ export default function ResultsPage() {
       )}
 
       {/* ════════════════════════════════════════════════
-          섹션 7 : R&D 처방 수정 지침
+          섹션 7 : R&D 처방 수정 지침 — 외부 패널 전용
       ════════════════════════════════════════════════ */}
-      {hasRdGuide && (
+      {isExternalPanel && hasRdGuide && (
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 mb-6">
           <SectionTitle
             step="6단계 · 페널티 분석"
