@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -93,6 +94,10 @@ export default function PanelSetupPage() {
 
   async function handleConfirm() {
     if (!selected) return
+    if (selected === 'external' && !hasEnoughCredits) {
+      setError('크레딧이 부족합니다.')
+      return
+    }
     setSaving(true)
     setError(null)
 
@@ -417,9 +422,17 @@ export default function PanelSetupPage() {
       )}
 
       {error && (
-        <p className="text-sm text-nogo bg-nogo/5 border border-nogo/20 rounded-xl px-4 py-3 mb-4">
-          {error}
-        </p>
+        <div className="flex items-center justify-between gap-3 bg-nogo/5 border border-nogo/20 rounded-xl px-4 py-3 mb-4">
+          <p className="text-sm text-nogo font-medium">{error}</p>
+          {error === '크레딧이 부족합니다.' && (
+            <Link
+              href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
+              className="flex-shrink-0 text-sm font-semibold text-white bg-navy px-3 py-1.5 rounded-lg hover:bg-navy/90 transition-colors"
+            >
+              크레딧 충전
+            </Link>
+          )}
+        </div>
       )}
 
       <Button
