@@ -57,8 +57,10 @@ async function main() {
   }
 
   // 5. 가상 응답 생성 (CONDITIONAL GO 시나리오)
+  // KS 문항은 부정형: 1점="그렇지 않다"(안전), 3-4점="그렇다"(발동)
+  // → KS 안전 시나리오는 1점(모두 안전), 트리거 패널만 4점으로 강제
   const groupScenarios: Record<string, number[]> = {
-    killsignal:   [4, 4, 4, 4, 4],  // 모두 4 — jitter로도 2 이하 불가, 오직 triggeredKs(idx=2)만 1로 강제
+    killsignal:   [1, 1, 1, 1, 1],  // 모두 1 = 이상반응 없음(안전), 오직 triggeredKs(idx=2)만 4로 강제
     usage:        [3, 4, 3, 4, 3],
     function:     [3, 3, 4, 3, 3],
     claim_risk:   [3, 2, 3, 2, 3],
@@ -82,8 +84,8 @@ async function main() {
 
     panelIds.forEach((panelId, idx) => {
       let score = scenario[idx % scenario.length]
-      // 1명의 패널에서 첫 번째 KS 문항 이상반응(1점) 시뮬레이션
-      if (triggeredKs && q.key === triggeredKs.key && idx === 2) score = 1
+      // 1명의 패널에서 첫 번째 KS 문항 이상반응(4점="매우 그렇다") 시뮬레이션
+      if (triggeredKs && q.key === triggeredKs.key && idx === 2) score = 4
       // 자연스러운 변동 (±1, 30% 확률) — KS 문항은 jitter 없음(의도치 않은 트리거 방지)
       const jitter = ksKeySet.has(q.key) ? 0 : (Math.random() < 0.3 ? (Math.random() < 0.5 ? 1 : -1) : 0)
       score = Math.max(1, Math.min(4, score + jitter))
@@ -172,9 +174,10 @@ async function main() {
       return { name: q.label, mean, sd, ci_lower, ci_upper, correlation_r, is_strength: ci_lower > threshold, is_weakness: ci_upper < threshold }
     })
 
+  // KS 문항은 부정형: 1점=안전, 3-4점=이상반응 발동
   const killSignals = ksQuestions.map(q => {
-    const scores  = panelIds.map(pid => responseMatrix[pid][q.key] ?? 4)
-    const triggered = scores.filter(s => s <= 2).length
+    const scores  = panelIds.map(pid => responseMatrix[pid][q.key] ?? 1)
+    const triggered = scores.filter(s => s >= 3).length  // 3점 이상 = 부작용 체감
     const ratio = Math.round((triggered / N) * 100) / 100
     return {
       name: q.label,
