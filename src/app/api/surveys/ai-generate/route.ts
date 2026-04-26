@@ -114,81 +114,82 @@ export async function POST(req: NextRequest) {
       : productInfo
 
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-5',
       max_tokens: 4096,
+      system: '당신은 화장품 관능 평가 전문가입니다. 반드시 순수 JSON 배열만 출력하세요. 설명, 마크다운 코드블록, 서문, 후기 텍스트를 절대 포함하지 마세요. 응답은 반드시 [ 로 시작하고 ] 로 끝나야 합니다.',
       messages: [
         {
           role: 'user',
-          content: `당신은 화장품 관능 평가 전문가입니다. 아래 제품 정보를 바탕으로 소비자 패널 설문 문항을 생성해주세요.
+          content: `아래 제품 정보를 바탕으로 소비자 패널 설문 문항을 생성하세요.
 
 제품 정보:
 ${safeInput}
 ${category ? `카테고리: ${category}` : ''}
 
-다음 규칙을 반드시 따라주세요:
-1. Kill Signal 문항 2~3개: 자극감·끈적임·이물감·냄새 이상 등 치명적 불만 감지용 — type: "scale" (4점 척도)
-2. 사용감(usage) 문항 3~4개: 제형감·발림성·흡수력·텍스처·도포감 등 — type: "scale" (4점 척도)
-3. 기능성(function) 문항 3~4개: 보습력·수분감·미백·주름개선·탄력 등 효능 — type: "scale" (4점 척도)
-4. 종합평가(overall) 문항 2~3개: 전반적 만족도·구매의향·추천의향 — type: "scale" (4점 척도)
+규칙:
+1. Kill Signal 문항 2~3개 (자극감·끈적임·이물감·냄새 이상 등) — type: "scale" (4점 척도)
+2. 사용감(usage) 문항 3~4개 (제형감·발림성·흡수력·텍스처) — type: "scale" (4점 척도)
+3. 기능성(function) 문항 3~4개 (보습력·수분감·미백·주름개선·탄력) — type: "scale" (4점 척도)
+4. 종합평가(overall) 문항 2~3개 (전반적 만족도·구매의향·추천의향) — type: "scale" (4점 척도)
 
-문항 type 규칙:
-- "scale": 4점 척도 문항 (scale=4, scaleLabels 필수)
-- "text": 주관식 서술형 (scale·scaleLabels 없음)
-- "choice": 객관식 선택형 (choices 배열 필수)
+group 값 (이 5가지만 허용):
+- "killsignal" : Kill Signal (isKillSignal: true 필수)
+- "usage"      : 사용감
+- "function"   : 기능성
+- "claim_risk" : Claim Risk
+- "overall"    : 종합평가
 
-아래 JSON 형식으로만 응답하세요 (마크다운 코드블록·설명 텍스트 없이, 순수 JSON 배열만 출력):
+polarity:
+- "positive": 높은 점수 = 좋음 (발림성, 보습, 만족 등)
+- "negative": 낮은 점수 = 좋음 (자극, 끈적임, 건조함 등)
+- killsignal 그룹은 반드시 "negative"
 
-[
-  {
-    "key": "q_고유ID",
-    "label": "문항 내용",
-    "type": "scale",
-    "scale": 4,
-    "scaleLabels": ["전혀 그렇지 않다", "그렇지 않다", "그렇다", "매우 그렇다"],
-    "isKillSignal": false,
-    "group": "usage",
-    "polarity": "positive",
-    "order": 1
-  }
-]
-
-group 값은 아래 5가지만 사용하세요 (그 외 값은 절대 사용 금지):
-- "killsignal" : Kill Signal 문항 (isKillSignal: true 필수) — 자극감, 끈적임, 이물감, 냄새 이상 등
-- "usage"      : 사용감 — 제형감, 발림성, 흡수력, 텍스처, 도포감, 밀착감 등
-- "function"   : 기능성 — 보습력, 수분감, 미백효과, 주름개선, 탄력, 피부결 등 효능·효과
-- "claim_risk" : Claim Risk — 광고 문구·마케팅 주장 검증 (예: "24시간 지속", "피부 장벽 강화" 등)
-- "overall"    : 종합평가 — 전반적 만족도, 구매의향, 추천의향, 재구매의향, 가성비
-
-polarity 규칙 (반드시 설정):
-- "positive": 높은 점수일수록 좋음 — ex) "발림성이 좋다", "보습이 잘 된다", "만족한다"
-- "negative": 낮은 점수일수록 좋음 — ex) "따가움을 느꼈다", "끈적임이 심하다", "건조함을 느꼈다"
-- Kill Signal 문항(group="killsignal")은 반드시 "negative"
-- 부정적 경험·불편·이상반응을 묻는 문항은 반드시 "negative"
-- 긍정적 경험·효과·만족을 묻는 문항은 "positive"
-
-isKillSignal: Kill Signal 문항(group="killsignal")만 true, 나머지는 반드시 false
-type이 "text"인 경우 scale·scaleLabels·polarity 필드 생략
-type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
+출력 형식 (JSON 배열만, 다른 텍스트 없이):
+[{"key":"q1","label":"문항 내용","type":"scale","scale":4,"scaleLabels":["전혀 그렇지 않다","그렇지 않다","그렇다","매우 그렇다"],"isKillSignal":false,"group":"usage","polarity":"positive","order":1}]`,
         },
       ],
     })
 
     const raw = (message.content[0] as { type: string; text: string }).text.trim()
 
-    // JSON 파싱 — 여러 형식 시도
+    // JSON 파싱 — 여러 형식 시도 (강건한 추출)
     let questions
+
+    // 균형잡힌 대괄호로 JSON 배열 추출하는 헬퍼
+    function extractJsonArray(text: string): string | null {
+      // [{ 로 시작하는 배열 찾기 (JSON 배열 of objects)
+      const startIdx = text.indexOf('[')
+      if (startIdx === -1) return null
+      let depth = 0
+      for (let i = startIdx; i < text.length; i++) {
+        if (text[i] === '[') depth++
+        else if (text[i] === ']') {
+          depth--
+          if (depth === 0) return text.slice(startIdx, i + 1)
+        }
+      }
+      return null
+    }
+
     const parseAttempts = [
       // 1) 직접 파싱
       () => JSON.parse(raw),
       // 2) ```json ... ``` 또는 ``` ... ``` 마크다운 코드블록 제거
       () => JSON.parse(raw.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()),
-      // 3) 텍스트 내에서 JSON 배열 추출 (첫 번째 [ ... ] 블록)
+      // 3) 균형잡힌 대괄호로 JSON 배열 추출 (greedy 문제 해결)
       () => {
-        const m = raw.match(/\[[\s\S]*\]/)
-        if (!m) throw new SyntaxError('no JSON array found')
-        return JSON.parse(m[0])
+        const extracted = extractJsonArray(raw)
+        if (!extracted) throw new SyntaxError('no JSON array found')
+        return JSON.parse(extracted)
       },
-      // 4) 텍스트 내에서 JSON 객체 추출 후 배열로 감싸기
+      // 4) 마크다운 제거 후 균형잡힌 대괄호 추출
+      () => {
+        const cleaned = raw.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
+        const extracted = extractJsonArray(cleaned)
+        if (!extracted) throw new SyntaxError('no JSON array found after cleaning')
+        return JSON.parse(extracted)
+      },
+      // 5) 텍스트 내에서 JSON 객체 추출 후 배열로 감싸기 (단일 객체 대응)
       () => {
         const m = raw.match(/\{[\s\S]*\}/)
         if (!m) throw new SyntaxError('no JSON object found')
@@ -208,7 +209,7 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
     }
 
     if (questions === undefined) {
-      console.error('[ai-generate] all parse attempts failed. raw:', raw.slice(0, 500))
+      console.error('[ai-generate] all parse attempts failed. raw (first 800 chars):', raw.slice(0, 800))
       throw lastErr
     }
 
