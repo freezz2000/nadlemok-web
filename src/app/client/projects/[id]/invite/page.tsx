@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Card, { CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -38,6 +38,7 @@ interface ClientPanelRow {
 // ── 메인 컴포넌트 ────────────────────────────────────────
 export default function InvitePage() {
   const { id: projectId } = useParams<{ id: string }>()
+  const router = useRouter()
   const supabase = createClient()
 
   // 기본 데이터
@@ -334,7 +335,8 @@ export default function InvitePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '설문 시작에 실패했습니다')
-      setSurveyStatus('active')
+      // 설문 시작 완료 → 프로젝트 페이지(진행 현황)로 이동
+      router.push(`/client/projects/${projectId}`)
     } catch (e) {
       setStartError(e instanceof Error ? e.message : '오류가 발생했습니다')
     } finally {
