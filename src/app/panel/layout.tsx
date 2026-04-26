@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import PendingInviteProcessor from './PendingInviteProcessor'
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireAuth(['panel'])
@@ -19,6 +20,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
 
   return (
     <DashboardShell role="panel" profile={profile}>
+      <PendingInviteProcessor />
       {children}
     </DashboardShell>
   )
