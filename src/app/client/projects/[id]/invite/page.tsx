@@ -133,16 +133,31 @@ export default function InvitePage() {
     if (clientId) {
       const { data: cpRows } = await supabase
         .from('client_panels')
-        .select('panel_id, profile:profiles!panel_id(name)')
+        .select('panel_id')
         .eq('client_id', clientId)
 
-      const linkJoined: LinkPanel[] = ((cpRows as ClientPanelRow[]) || [])
-        .filter((cp) => !alimtalkPanelIdSet.has(cp.panel_id))
-        .map((cp) => ({
-          panel_id: cp.panel_id,
-          status: 'matched',
-          profile: cp.profile,
-        }))
+      const linkPanelIds = ((cpRows as { panel_id: string }[]) || [])
+        .map((cp) => cp.panel_id)
+        .filter((pid) => !alimtalkPanelIdSet.has(pid))
+
+      // 이름은 profiles 테이블에서 별도 조회 (FK join 없이)
+      let profileMap: Record<string, string> = {}
+      if (linkPanelIds.length > 0) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, name')
+          .in('id', linkPanelIds)
+        profileMap = Object.fromEntries(
+          ((profileRows as { id: string; name: string | null }[]) || [])
+            .map((p) => [p.id, p.name || ''])
+        )
+      }
+
+      const linkJoined: LinkPanel[] = linkPanelIds.map((pid) => ({
+        panel_id: pid,
+        status: 'matched',
+        profile: profileMap[pid] ? [{ name: profileMap[pid] }] : null,
+      }))
       setLinkPanels(linkJoined)
     } else {
       setLinkPanels([])
