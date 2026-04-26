@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import { createClient } from '@/lib/supabase/client'
@@ -13,9 +13,10 @@ import {
 
 type PanelSource = 'internal' | 'external'
 
-export default function PanelSetupPage() {
+function PanelSetupContent() {
   const { id: projectId } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [productName, setProductName] = useState('')
@@ -69,6 +70,15 @@ export default function PanelSetupPage() {
       if (d.ageRanges?.length) setAgeRanges(d.ageRanges)
       if (d.skinTypes?.length) setSkinTypes(d.skinTypes)
       if (d.skinConcerns?.length) setSkinConcerns(d.skinConcerns)
+
+      // 크레딧 결제 후 복귀 시 URL 파라미터로 폼 상태 복원
+      // ds=1: 배송대행 체크됨, ec=N: 인원수
+      if (searchParams.get('ds') === '1') {
+        setSelected('external')
+        setDeliveryService(true)
+        const ec = Number(searchParams.get('ec'))
+        if (ec > 0) setExternalCount(ec)
+      }
 
       // 크레딧 잔액
       const { data: { user } } = await supabase.auth.getUser()
@@ -424,14 +434,21 @@ export default function PanelSetupPage() {
       {error && (
         <div className="flex items-center justify-between gap-3 bg-nogo/5 border border-nogo/20 rounded-xl px-4 py-3 mb-4">
           <p className="text-sm text-nogo font-medium">{error}</p>
-          {error === '크레딧이 부족합니다.' && (
-            <Link
-              href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup&projectId=${projectId}${deliveryService ? `&deliveryPanelCount=${externalCount}` : ''}`}
-              className="flex-shrink-0 text-sm font-semibold text-white bg-navy px-3 py-1.5 rounded-lg hover:bg-navy/90 transition-colors"
-            >
-              크레딧 충전
-            </Link>
-          )}
+          {error === '크레딧이 부족합니다.' && (() => {
+            // 복귀 시 폼 상태 복원을 위해 현재 설정을 returnTo에 인코딩
+            const returnToPath = deliveryService
+              ? `/client/projects/${projectId}/panel-setup?ds=1&ec=${externalCount}`
+              : `/client/projects/${projectId}/panel-setup`
+            const href = `/client/subscription?returnTo=${encodeURIComponent(returnToPath)}&projectId=${projectId}${deliveryService ? `&deliveryPanelCount=${externalCount}` : ''}`
+            return (
+              <Link
+                href={href}
+                className="flex-shrink-0 text-sm font-semibold text-white bg-navy px-3 py-1.5 rounded-lg hover:bg-navy/90 transition-colors"
+              >
+                크레딧 충전
+              </Link>
+            )
+          })()}
         </div>
       )}
 
@@ -455,5 +472,17 @@ export default function PanelSetupPage() {
         </p>
       )}
     </div>
+  )
+}
+
+export default function PanelSetupPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-48">
+        <div className="w-6 h-6 border-2 border-navy border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <PanelSetupContent />
+    </Suspense>
   )
 }
