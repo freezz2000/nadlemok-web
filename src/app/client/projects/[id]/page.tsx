@@ -43,6 +43,17 @@ export default function ClientProjectDetailPage() {
   const [fileUploading, setFileUploading] = useState(false)
   const [fileError, setFileError] = useState('')
 
+  // 테스트 진행 현황 (isTesting)
+  interface TestingPanel {
+    panel_id: string; name: string; gender: string; age_group: string
+    skin_type: string; skin_concern: string; matched_at: string
+    status: string; has_responded: boolean
+  }
+  const [testingPanels, setTestingPanels] = useState<TestingPanel[]>([])
+  const [testingRespondedCount, setTestingRespondedCount] = useState(0)
+  const [testingSurveyInfo, setTestingSurveyInfo] = useState<{ id: string; status: string; questions_count: number } | null>(null)
+  const [endingTest, setEndingTest] = useState(false)
+
   useEffect(() => { load() }, [id])
 
   async function load() {
@@ -77,6 +88,17 @@ export default function ClientProjectDetailPage() {
       const { data: tmpls } = await supabase
         .from('survey_templates').select('*').order('is_default', { ascending: false })
       setTemplates(tmpls || [])
+    }
+
+    // testing 상태: 패널 응답 현황 로드
+    if (proj?.status === 'testing') {
+      const res = await fetch(`/api/projects/${id}/testing-status`)
+      if (res.ok) {
+        const data = await res.json()
+        setTestingPanels(data.panels || [])
+        setTestingRespondedCount(data.responded_count ?? 0)
+        setTestingSurveyInfo(data.survey ?? null)
+      }
     }
   }
 
@@ -217,6 +239,27 @@ export default function ClientProjectDetailPage() {
       }
     } finally {
       setConfirming(false)
+    }
+  }
+
+  async function handleEndTest() {
+    if (!window.confirm('테스트를 종료하면 패널이 더 이상 설문에 응답할 수 없습니다.\n수집된 응답으로 분석을 시작하시겠습니까?')) return
+    setEndingTest(true)
+    try {
+      const res = await fetch('/api/projects/end-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        const { data: updated } = await supabase.from('projects').select('*').eq('id', id).single()
+        if (updated) setProject(updated)
+      } else {
+        alert(data.error || '테스트 종료에 실패했습니다.')
+      }
+    } finally {
+      setEndingTest(false)
     }
   }
 
@@ -417,7 +460,7 @@ export default function ClientProjectDetailPage() {
           </div>
         )}
         {isTesting && isInternal && (
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex justify-center gap-3">
             <Link
               href={`/client/projects/${id}/invite`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
@@ -425,13 +468,18 @@ export default function ClientProjectDetailPage() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
-              패널 초대하기
+              패널 초대 · 응답 관리
             </Link>
+            <Button variant="secondary" size="sm" onClick={handleEndTest} loading={endingTest}>
+              테스트 종료
+            </Button>
           </div>
         )}
         {isTesting && !isInternal && (
-          <div className="mt-4 text-center">
-            <p className="text-xs text-text-muted">배정된 외부 패널이 테스트를 진행하고 있습니다.</p>
+          <div className="mt-4 flex justify-center">
+            <Button variant="secondary" size="sm" onClick={handleEndTest} loading={endingTest}>
+              테스트 종료
+            </Button>
           </div>
         )}
         {isAnalyzing && (
@@ -453,6 +501,91 @@ export default function ClientProjectDetailPage() {
           </div>
         )}
       </Card>
+
+      {/* === testing 상태: 패널 응답 현황 === */}
+      {isTesting && (
+        <Card className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle>패널 응답 현황</CardTitle>
+            {testingSurveyInfo && (
+              <span className="text-xs text-text-muted">
+                {testingSurveyInfo.questions_count}문항 · {testingRespondedCount}/{testingPanels.length}명 응답
+              </span>
+            )}
+          </div>
+
+          {/* 진행률 바 */}
+          <div className="mb-5 p-4 bg-surface rounded-xl border border-border">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-text">전체 설문 진행률</span>
+              <span className="text-sm font-bold text-navy">{testingRespondedCount} / {testingPanels.length}명 응답</span>
+            </div>
+            <div className="h-2 bg-surface-dark rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-navy rounded-full transition-all"
+                style={{ width: `${testingPanels.length > 0 ? Math.round((testingRespondedCount / testingPanels.length) * 100) : 0}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="text-center p-3 bg-go-bg rounded-lg border border-go/20">
+                <p className="text-xs text-text-muted mb-0.5">응답 완료</p>
+                <p className="text-2xl font-bold text-go">{testingRespondedCount}명</p>
+              </div>
+              <div className="text-center p-3 bg-surface-dark rounded-lg border border-border">
+                <p className="text-xs text-text-muted mb-0.5">미응답</p>
+                <p className="text-2xl font-bold text-nogo">{testingPanels.length - testingRespondedCount}명</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 패널 테이블 */}
+          {testingPanels.length === 0 ? (
+            <p className="text-sm text-text-muted text-center py-4">배정된 패널이 없습니다. 초대 페이지에서 패널을 선택하세요.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">이름</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">성별</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">연령대</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">피부타입</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">피부고민</th>
+                    <th className="text-left py-2 px-3 text-xs font-medium text-text-muted">배정일</th>
+                    <th className="text-center py-2 px-3 text-xs font-medium text-text-muted">설문 진행</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {testingPanels.map((p) => (
+                    <tr key={p.panel_id} className="border-b border-border/50 hover:bg-surface/50">
+                      <td className="py-2.5 px-3 font-medium text-text">{p.name}</td>
+                      <td className="py-2.5 px-3 text-text-muted">{p.gender}</td>
+                      <td className="py-2.5 px-3 text-text-muted">{p.age_group}</td>
+                      <td className="py-2.5 px-3 text-text-muted">{p.skin_type}</td>
+                      <td className="py-2.5 px-3 text-text-muted">{p.skin_concern}</td>
+                      <td className="py-2.5 px-3 text-text-muted text-xs">
+                        {new Date(p.matched_at).toLocaleDateString('ko-KR')}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        {p.has_responded ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-go">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            응답 완료
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-nogo">× 미응답</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* === draft 상태: 설문 편집 === */}
       {isDraft && (
