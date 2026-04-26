@@ -53,6 +53,7 @@ export default function ClientProjectDetailPage() {
   const [testingRespondedCount, setTestingRespondedCount] = useState(0)
   const [testingSurveyInfo, setTestingSurveyInfo] = useState<{ id: string; status: string; questions_count: number } | null>(null)
   const [endingTest, setEndingTest] = useState(false)
+  const [showEndTestConfirm, setShowEndTestConfirm] = useState(false)
 
   // 패널 응답 결과 (completed / analyzing)
   interface PanelResponseItem {
@@ -271,8 +272,12 @@ export default function ClientProjectDetailPage() {
     }
   }
 
-  async function handleEndTest() {
-    if (!window.confirm('테스트를 종료하면 패널이 더 이상 설문에 응답할 수 없습니다.\n수집된 응답으로 분석을 시작하시겠습니까?')) return
+  function handleEndTest() {
+    setShowEndTestConfirm(true)
+  }
+
+  async function confirmEndTest() {
+    setShowEndTestConfirm(false)
     setEndingTest(true)
     try {
       const res = await fetch('/api/projects/end-test', {
@@ -862,6 +867,90 @@ export default function ClientProjectDetailPage() {
           </div>
         )
       })()}
+
+      {/* === 테스트 종료 확인 모달 === */}
+      {showEndTestConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowEndTestConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 아이콘 */}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              testingRespondedCount < 3 ? 'bg-gold/10' : 'bg-surface-dark'
+            }`}>
+              {testingRespondedCount < 3 ? (
+                <svg className="w-6 h-6 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+
+            {/* 제목 */}
+            <h3 className="text-base font-bold text-text text-center mb-2">
+              테스트를 종료하시겠습니까?
+            </h3>
+
+            {/* 본문 */}
+            {testingRespondedCount < 3 ? (
+              <div className="bg-gold/5 border border-gold/20 rounded-xl p-3 mb-4">
+                <p className="text-sm text-center text-text-muted leading-relaxed">
+                  현재 <span className="font-bold text-gold">{testingRespondedCount}명</span>만 응답했습니다.
+                  <br />
+                  신뢰도 높은 분석을 위해{' '}
+                  <span className="font-semibold text-text">3명 이상 응답 후</span>{' '}
+                  테스트를 종료하는 것을 권장합니다.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted text-center leading-relaxed mb-4">
+                <span className="font-bold text-go">{testingRespondedCount}명</span>이 응답을 완료했습니다.
+                <br />
+                종료 후 패널은 더 이상 설문에 응답할 수 없으며,
+                <br />
+                수집된 응답으로 분석이 시작됩니다.
+              </p>
+            )}
+
+            {testingRespondedCount < 3 && (
+              <p className="text-xs text-text-muted text-center mb-4">
+                종료 후 패널은 더 이상 설문에 응답할 수 없으며,
+                <br />
+                수집된 응답으로 분석이 시작됩니다.
+              </p>
+            )}
+
+            {/* 버튼 */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowEndTestConfirm(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-text-muted border border-border rounded-xl hover:bg-surface transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={confirmEndTest}
+                className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-colors ${
+                  testingRespondedCount < 3
+                    ? 'bg-gold hover:bg-gold/90'
+                    : 'bg-navy hover:bg-navy/90'
+                }`}
+              >
+                {testingRespondedCount < 3 ? '그래도 종료하기' : '종료 확인'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* === draft 상태: 설문 편집 === */}
       {isDraft && (
