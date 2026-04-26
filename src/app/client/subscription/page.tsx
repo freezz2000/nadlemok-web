@@ -43,22 +43,74 @@ function SubscriptionContent() {
   const [selectedPkg, setSelectedPkg] = useState<number>(50) // credits
   const [paying, setPaying] = useState(false)
 
+  // 결제 내역 / 환불
+  interface PaymentRecord {
+    id: string
+    order_id: string
+    payment_key: string | null
+    amount: number
+    status: 'DONE' | 'CANCELED' | 'FAILED'
+    paid_at: string | null
+    created_at: string
+  }
+  const AMOUNT_TO_CREDITS: Record<number, number> = { 500000: 30, 800000: 50 }
+  const [payments, setPayments] = useState<PaymentRecord[]>([])
+  const [refundingId, setRefundingId] = useState<string | null>(null)
+  const [refundMsg, setRefundMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null)
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setUserId(user.id)
 
-      const { data: cr } = await supabase
-        .from('client_credits')
-        .select('balance')
-        .eq('client_id', user.id)
-        .single()
+      const [{ data: cr }, { data: payData }] = await Promise.all([
+        supabase
+          .from('client_credits')
+          .select('balance')
+          .eq('client_id', user.id)
+          .single(),
+        supabase
+          .from('payments')
+          .select('id, order_id, payment_key, amount, status, paid_at, created_at')
+          .eq('user_id', user.id)
+          .eq('payment_context', 'credit_charge')
+          .order('created_at', { ascending: false }),
+      ])
       setCreditBalance(cr?.balance ?? 0)
+      setPayments((payData as PaymentRecord[]) || [])
       setLoading(false)
     }
     load()
   }, [supabase])
+
+  async function handleRefund(paymentId: string, credits: number, amount: number) {
+    if (!confirm(`${amount.toLocaleString()}원 (${credits}cr) 결제를 환불 신청하시겠습니까?\n\n환불 처리 후 크레딧이 즉시 차감됩니다.`)) return
+    setRefundingId(paymentId)
+    setRefundMsg(null)
+    try {
+      const res = await fetch('/api/credits/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setRefundMsg({ type: 'error', text: data.error || '환불 처리에 실패했습니다.' })
+      } else {
+        setRefundMsg({
+          type: 'success',
+          text: `환불이 완료되었습니다. ${data.refundedAmount.toLocaleString()}원이 카드사를 통해 환불됩니다. (3~5 영업일 소요)`,
+        })
+        setCreditBalance(data.newBalance)
+        setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, status: 'CANCELED' } : p))
+      }
+    } catch {
+      setRefundMsg({ type: 'error', text: '서버 오류가 발생했습니다. 다시 시도해주세요.' })
+    } finally {
+      setRefundingId(null)
+    }
+  }
 
   async function handlePay() {
     if (!userId) return
@@ -200,6 +252,110 @@ function SubscriptionContent() {
       <p className="text-xs text-text-muted text-center mt-3">
         결제 즉시 크레딧이 충전되며, 패널 검증에 사용할 수 있습니다
       </p>
+
+      {/* ── 결제 내역 / 환불 ───────────────────────────────── */}
+      {payments.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-base font-bold text-text mb-3">결제 내역</h2>
+
+          {/* 환불 결과 메시지 */}
+          {refundMsg && (
+            <div className={`mb-4 px-4 py-3 rounded-xl text-sm border ${
+              refundMsg.type === 'error'
+                ? 'bg-nogo-bg border-nogo/20 text-nogo'
+                : 'bg-go-bg border-go/20 text-go'
+            }`}>
+              {refundMsg.text}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {payments.map((pay) => {
+              const credits = AMOUNT_TO_CREDITS[pay.amount]
+              const isRefunding = refundingId === pay.id
+              // 잔액 기준 사용 여부 판단 (전액 잔여일 때만 환불 가능)
+              const enoughBalance = credits !== undefined && (creditBalance ?? 0) >= credits
+              const canRefund = pay.status === 'DONE' && !!pay.payment_key && enoughBalance
+
+              return (
+                <div
+                  key={pay.id}
+                  className={`rounded-xl border p-4 ${
+                    pay.status === 'CANCELED' ? 'bg-surface border-border opacity-60' : 'bg-white border-border'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-text">
+                          {pay.amount.toLocaleString()}원
+                        </span>
+                        {credits !== undefined && (
+                          <span className="text-xs font-medium text-navy bg-blue-50 px-2 py-0.5 rounded-full">
+                            {credits}cr 충전
+                          </span>
+                        )}
+                        {pay.status === 'DONE' && (
+                          <span className="text-xs font-medium text-go bg-go-bg px-2 py-0.5 rounded-full">결제완료</span>
+                        )}
+                        {pay.status === 'CANCELED' && (
+                          <span className="text-xs font-medium text-text-muted bg-surface border border-border px-2 py-0.5 rounded-full">환불완료</span>
+                        )}
+                        {pay.status === 'FAILED' && (
+                          <span className="text-xs font-medium text-nogo bg-nogo-bg px-2 py-0.5 rounded-full">결제실패</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-text-muted mt-1.5">
+                        {new Date(pay.paid_at || pay.created_at).toLocaleString('ko-KR', {
+                          year: 'numeric', month: '2-digit', day: '2-digit',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                      {/* 크레딧 사용됨 경고 */}
+                      {pay.status === 'DONE' && credits !== undefined && !enoughBalance && (
+                        <p className="text-xs text-amber-600 mt-1">
+                          크레딧이 사용되어 환불이 불가능합니다
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 환불 버튼 */}
+                    {pay.status === 'DONE' && (
+                      <button
+                        onClick={() => canRefund && credits && handleRefund(pay.id, credits, pay.amount)}
+                        disabled={!canRefund || isRefunding}
+                        className={`flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                          !canRefund
+                            ? 'bg-surface text-text-muted border-border cursor-not-allowed'
+                            : 'bg-white text-nogo border-nogo/30 hover:bg-nogo hover:text-white hover:border-nogo'
+                        }`}
+                      >
+                        {isRefunding ? (
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin inline-block" />
+                            처리 중
+                          </span>
+                        ) : '환불 신청'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 환불 정책 안내 */}
+          <div className="mt-4 p-4 bg-surface rounded-xl border border-border">
+            <p className="text-xs font-semibold text-text mb-2">환불 정책</p>
+            <ul className="space-y-1">
+              <li className="text-xs text-text-muted">• 크레딧을 전혀 사용하지 않은 경우 전액 환불 가능합니다</li>
+              <li className="text-xs text-text-muted">• 크레딧을 일부라도 사용한 경우 환불이 불가능합니다</li>
+              <li className="text-xs text-text-muted">• 환불 완료 후 카드사 처리까지 3~5 영업일이 소요됩니다</li>
+              <li className="text-xs text-text-muted">• 문의: <a href="mailto:official@linebreakers.co.kr" className="text-navy hover:underline">official@linebreakers.co.kr</a></li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
