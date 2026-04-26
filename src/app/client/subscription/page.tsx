@@ -43,6 +43,11 @@ function SubscriptionContent() {
   const [selectedPkg, setSelectedPkg] = useState<number>(50) // credits
   const [paying, setPaying] = useState(false)
 
+  // 배송 대행 선결제 파라미터
+  const rawProjectId = searchParams.get('projectId')
+  const deliveryPanelCount = Number(searchParams.get('deliveryPanelCount') ?? '0')
+  const deliveryFee = deliveryPanelCount > 0 ? deliveryPanelCount * 10_000 : 0
+
   // 결제 내역 / 환불
   interface PaymentRecord {
     id: string
@@ -117,20 +122,27 @@ function SubscriptionContent() {
     setPaying(true)
 
     const pkg = CREDIT_PACKAGES.find(p => p.credits === selectedPkg)!
+    const totalAmount = pkg.price + deliveryFee
     const orderId = `nadlemok-credit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
     const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!
-    const customerKey = `nc-${userId}` // "nc-" + UUID(36자) = 39자, 50자 이하
+    const customerKey = `nc-${userId}`
 
     try {
       const tossPayments = await loadTossPayments(clientKey)
       const payment = tossPayments.payment({ customerKey })
       const baseUrl = window.location.origin
-      const successUrl = `${baseUrl}/client/subscription/credit-success?credits=${pkg.credits}&returnTo=${encodeURIComponent(returnTo || '/client/subscription')}`
+      let successUrl = `${baseUrl}/client/subscription/credit-success?credits=${pkg.credits}&returnTo=${encodeURIComponent(returnTo || '/client/subscription')}`
+      if (deliveryFee > 0 && rawProjectId) {
+        successUrl += `&deliveryFee=${deliveryFee}&projectId=${rawProjectId}`
+      }
+      const orderName = deliveryFee > 0
+        ? `나들목 크레딧 ${pkg.credits}개 + 배송 대행료 (${deliveryPanelCount}명)`
+        : `나들목 크레딧 ${pkg.credits}개 (외부 패널 ${pkg.credits}명 검증)`
       await payment.requestPayment({
         method: 'CARD',
-        amount: { value: pkg.price, currency: 'KRW' },
+        amount: { value: totalAmount, currency: 'KRW' },
         orderId,
-        orderName: `나들목 크레딧 ${pkg.credits}개 (외부 패널 ${pkg.credits}명 검증)`,
+        orderName,
         successUrl,
         failUrl: `${baseUrl}/client/subscription/billing-fail`,
       })
@@ -229,15 +241,27 @@ function SubscriptionContent() {
           <span className="text-text-muted">충전 크레딧</span>
           <span className="font-medium">{pkg.credits}cr</span>
         </div>
+        {deliveryFee > 0 && (
+          <div className="flex justify-between text-sm mb-1">
+            <span className="text-text-muted">
+              샘플 배송 대행료
+              <span className="ml-1 text-xs text-text-muted/70">({deliveryPanelCount}명 × 10,000원)</span>
+            </span>
+            <span className="font-medium text-amber-600">{deliveryFee.toLocaleString('ko-KR')}원</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm pt-2 mt-1 border-t border-border">
           <span className="font-semibold text-text">결제 금액</span>
-          <span className="font-bold text-navy text-base">{pkg.priceLabel}</span>
+          <span className="font-bold text-navy text-base">
+            {(pkg.price + deliveryFee).toLocaleString('ko-KR')}원
+          </span>
         </div>
         <p className="text-xs text-text-muted mt-1.5">* VAT 별도</p>
       </div>
 
       <Button onClick={handlePay} loading={paying} className="w-full" size="lg">
-        {pkg.priceLabel} 결제하고 {pkg.credits}cr 충전
+        {(pkg.price + deliveryFee).toLocaleString('ko-KR')}원 결제하고 {pkg.credits}cr 충전
+        {deliveryFee > 0 && ' + 배송 대행료'}
       </Button>
 
       {returnTo && (

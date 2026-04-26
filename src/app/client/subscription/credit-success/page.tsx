@@ -17,6 +17,8 @@ function CreditSuccessContent() {
       const orderId = searchParams.get('orderId')
       const amount = Number(searchParams.get('amount'))
       const creditsParam = Number(searchParams.get('credits'))
+      const deliveryFee = Number(searchParams.get('deliveryFee') ?? '0')
+      const projectId = searchParams.get('projectId') ?? null
       // returnTo 검증: 내부 경로(/)만 허용 (Open Redirect 방지)
       const rawReturnTo = searchParams.get('returnTo')
       const returnTo = rawReturnTo?.startsWith('/') ? rawReturnTo : '/client/subscription'
@@ -30,7 +32,7 @@ function CreditSuccessContent() {
       const res = await fetch('/api/payment/credit-confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentKey, orderId, amount, credits: creditsParam }),
+        body: JSON.stringify({ paymentKey, orderId, amount, credits: creditsParam, deliveryFee, projectId }),
       })
       const data = await res.json()
 

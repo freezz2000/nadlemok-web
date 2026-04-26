@@ -19,21 +19,24 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: '인증 필요' }, { status: 401 })
 
-    const { paymentKey, orderId, amount, credits } = await req.json() as {
+    const { paymentKey, orderId, amount, credits, deliveryFee, projectId } = await req.json() as {
       paymentKey: string
       orderId: string
       amount: number
       credits: number
+      deliveryFee?: number
+      projectId?: string
     }
 
     if (!paymentKey || !orderId || !amount || !credits) {
       return NextResponse.json({ error: '필수 파라미터 누락' }, { status: 400 })
     }
 
-    // 크레딧·금액 유효성 검증
+    // 크레딧·금액 유효성 검증 (배송 대행료 포함 합산)
     const pkg = CREDIT_PACKAGES[credits]
-    if (!pkg || pkg.price !== amount) {
-      return NextResponse.json({ error: '유효하지 않은 크레딧 패키지입니다.' }, { status: 400 })
+    const expectedAmount = (pkg?.price ?? 0) + (deliveryFee ?? 0)
+    if (!pkg || expectedAmount !== amount) {
+      return NextResponse.json({ error: '유효하지 않은 결제 금액입니다.' }, { status: 400 })
     }
 
     // 중복 결제 방지
@@ -109,11 +112,26 @@ export async function POST(req: NextRequest) {
       client_id: user.id,
       amount: credits,
       transaction_type: 'subscription',
-      note: `크레딧 ${credits}개 충전 (${amount.toLocaleString()}원 결제)`,
+      note: deliveryFee && deliveryFee > 0
+        ? `크레딧 ${credits}개 + 배송 대행료 ${deliveryFee.toLocaleString()}원 합산 결제`
+        : `크레딧 ${credits}개 충전 (${amount.toLocaleString()}원 결제)`,
     })
     if (txErr) {
       console.error('[credit-confirm] credit_transactions insert error:', txErr.message)
-      // 거래 이력 실패는 크리티컬하지 않으므로 계속 진행
+    }
+
+    // 배송 대행료 선결제 처리 — 프로젝트 delivery_service_paid 플래그 설정
+    if (deliveryFee && deliveryFee > 0 && projectId) {
+      try {
+        await admin
+          .from('projects')
+          .update({ delivery_service_paid: true })
+          .eq('id', projectId)
+          .eq('client_id', user.id)
+      } catch (e) {
+        // 컬럼 미존재 시 무시 (Supabase migration 실행 전)
+        console.warn('[credit-confirm] delivery_service_paid update skipped:', e)
+      }
     }
 
     return NextResponse.json({ success: true, credits, remaining: newBalance })

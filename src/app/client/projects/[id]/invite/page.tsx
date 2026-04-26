@@ -61,6 +61,7 @@ export default function InvitePage() {
 
   // 배송 대행
   const [deliveryService, setDeliveryService] = useState(false)
+  const [deliveryServicePaid, setDeliveryServicePaid] = useState(false)
 
   // 설문 시작
   const [startingsurvey, setStartingSurvey] = useState(false)
@@ -77,12 +78,13 @@ export default function InvitePage() {
     // 프로젝트명 + 배송 대행 여부
     const { data: proj } = await supabase
       .from('projects')
-      .select('product_name, delivery_service')
+      .select('product_name, delivery_service, delivery_service_paid')
       .eq('id', projectId)
       .single()
     if (proj) {
       setProductName(proj.product_name)
       setDeliveryService(proj.delivery_service ?? false)
+      setDeliveryServicePaid((proj as Record<string, unknown>).delivery_service_paid as boolean ?? false)
     }
 
     // 초대 링크
@@ -251,11 +253,12 @@ export default function InvitePage() {
     if (!surveyId) return
     setStartError(null)
 
-    // 배송 대행 신청 시 → TossPayments 결제 후 시작
-    if (deliveryService) {
+    // 배송 대행 신청 시: 선결제 완료 여부 확인
+    if (deliveryService && !deliveryServicePaid) {
       await handleDeliveryPayment()
       return
     }
+    // deliveryServicePaid=true 이면 이미 크레딧 충전 시 결제 완료 → 바로 시작
 
     // 일반 시작
     setStartingSurvey(true)
@@ -519,10 +522,16 @@ export default function InvitePage() {
                   : '위 패널 목록에서 설문에 참여할 패널을 선택한 뒤 저장하세요.'}
               </p>
               {deliveryService && selectedAssignment.size > 0 && (
-                <p className="text-xs text-amber-600 font-medium mt-1.5">
-                  배송 대행료 결제 필요 · {(selectedAssignment.size * 10_000).toLocaleString('ko-KR')}원
-                  <span className="text-text-muted font-normal ml-1">({selectedAssignment.size}명 × 10,000원)</span>
-                </p>
+                deliveryServicePaid ? (
+                  <p className="text-xs text-go font-medium mt-1.5">
+                    배송 대행료 결제 완료 ✓
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 font-medium mt-1.5">
+                    배송 대행료 결제 필요 · {(selectedAssignment.size * 10_000).toLocaleString('ko-KR')}원
+                    <span className="text-text-muted font-normal ml-1">({selectedAssignment.size}명 × 10,000원)</span>
+                  </p>
+                )
               )}
             </div>
             <Button
@@ -530,7 +539,7 @@ export default function InvitePage() {
               loading={startingsurvey || paying}
               disabled={selectedAssignment.size === 0}
             >
-              {deliveryService ? '결제 후 시작하기' : '설문 시작하기'}
+              {deliveryService && !deliveryServicePaid ? '결제 후 시작하기' : '설문 시작하기'}
             </Button>
           </div>
           {startError && <p className="text-xs text-nogo mt-3">{startError}</p>}

@@ -426,7 +426,7 @@ export default function PanelSetupPage() {
           <p className="text-sm text-nogo font-medium">{error}</p>
           {error === '크레딧이 부족합니다.' && (
             <Link
-              href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup`}
+              href={`/client/subscription?returnTo=/client/projects/${projectId}/panel-setup&projectId=${projectId}${deliveryService ? `&deliveryPanelCount=${externalCount}` : ''}`}
               className="flex-shrink-0 text-sm font-semibold text-white bg-navy px-3 py-1.5 rounded-lg hover:bg-navy/90 transition-colors"
             >
               크레딧 충전
