@@ -66,7 +66,7 @@ export default function Sidebar({ role, isOpen = false, onClose }: SidebarProps)
         .single()
         .then(({ data }) => setCreditBalance(data?.balance ?? 0))
     })
-  }, [role])
+  }, [role, pathname])
 
   return (
     <aside className={`w-64 h-screen bg-navy text-white flex flex-col fixed left-0 top-0 z-40 transition-transform duration-300
