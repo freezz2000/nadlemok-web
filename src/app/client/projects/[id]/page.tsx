@@ -787,8 +787,11 @@ export default function ClientProjectDetailPage() {
                 <div className="space-y-2">
                   {qs.map((q, i) => {
                     if (q.type === 'scale') {
+                      const DEFAULT_SCALE_LABELS_LIST = ['매우 그렇지 않다', '그렇지 않다', '그렇다', '매우 그렇다']
                       const score = responses[q.key] as number | undefined
-                      const scoreLabel = (score != null && q.scaleLabels) ? q.scaleLabels[score - 1] : null
+                      const scoreLabel = score != null
+                        ? (q.scaleLabels?.[score - 1] || DEFAULT_SCALE_LABELS_LIST[score - 1] || `${score}점`)
+                        : null
                       const isKs = q.isKillSignal
                       const scoreColor = score == null ? 'text-text-muted' :
                         score >= 3 ? 'text-go' : score === 2 ? 'text-cgo' : 'text-nogo'
@@ -802,11 +805,9 @@ export default function ClientProjectDetailPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-text leading-snug">{q.label || '(내용 없음)'}</p>
                             {score != null ? (
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <span className={`text-xl font-black ${scoreColor}`}>{score}점</span>
-                                {scoreLabel && (
-                                  <span className="text-xs text-text-muted">{scoreLabel}</span>
-                                )}
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                <span className={`text-lg font-black ${scoreColor}`}>{score}점</span>
+                                <span className={`text-sm font-medium ${scoreColor}`}>{scoreLabel}</span>
                                 {/* 점수 바 */}
                                 <div className="flex-1 h-1.5 bg-surface-dark rounded-full overflow-hidden max-w-[80px]">
                                   <div
