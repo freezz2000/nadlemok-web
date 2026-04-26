@@ -7,6 +7,37 @@ loadEnvConfig(process.cwd())
 
 import { createClient } from '@supabase/supabase-js'
 
+// ── 극성 유틸 (survey-analysis.ts 동일 로직 복사) ─────────────────
+const POSITIVE_SUFFIX = ['없다', '없어', '없음', '적다', '적어', '않다', '않아', '안 ', '안느', '편이다', '괜찮']
+const NEGATIVE_PATTERNS = [
+  '따가움을', '따가움이 느', '화끈거림을', '화끈거림이', '화끈하다', '따갑다',
+  '트러블이 발생', '뾰루지', '발진이', '알레르기', '이상반응', '부작용',
+  '붉어졌다', '붉어짐이', '가려움을', '가렵다', '자극을 느', '자극감이', '자극적이',
+  '불편하다', '불편함을', '불쾌하다', '불쾌감', '거부감이',
+  '밀린다', '밀림이', '뭉친다', '뭉침이',
+  '끈적임을 느', '끈적임이 심', '끈적거린다', '번들거린다',
+  '무겁게 느', '무거워서', '답답하다', '건조해진다', '건조함을 느', '오히려 건조',
+  '냄새가 난다', '냄새가 거', '악취', '이취', '이물감',
+  '눈이 따가', '피부가 붉어', '사용 후.*발생',
+  '을 느꼈다', '을 경험했다', '이 발생했다',
+]
+function detectPolarityFromLabel(label: string): 'positive' | 'negative' {
+  if (!label) return 'positive'
+  if (POSITIVE_SUFFIX.some((sfx) => label.includes(sfx))) return 'positive'
+  const matched = NEGATIVE_PATTERNS.some((pat) => {
+    try { return new RegExp(pat).test(label) } catch { return label.includes(pat) }
+  })
+  return matched ? 'negative' : 'positive'
+}
+function resolvePolarity(q: { polarity?: string; isKillSignal?: boolean; label: string }): 'positive' | 'negative' {
+  if (q.isKillSignal) return 'negative'
+  if (q.polarity === 'positive' || q.polarity === 'negative') return q.polarity
+  return detectPolarityFromLabel(q.label)
+}
+function normalizeScore(raw: number, polarity: 'positive' | 'negative', maxScale = 4): number {
+  return polarity === 'negative' ? (maxScale + 1) - raw : raw
+}
+
 const projectId = process.argv[2]
 if (!projectId) { console.error('❌ projectId를 인수로 전달하세요'); process.exit(1) }
 
@@ -80,46 +111,67 @@ async function main() {
   const ksKeySet = new Set(ksQuestions.map(q => q.key))
   const threshold = (project.satisfaction_threshold as number) ?? 3.0
 
+  // 정규화된 점수 배열 반환 (polarity 반영)
+  const getNormVals = (q: typeof questions[0]): number[] => {
+    const polarity = resolvePolarity(q)
+    return panelIds
+      .map(pid => responseMap[pid][q.key])
+      .filter((v): v is number => typeof v === 'number' && v > 0)
+      .map(v => normalizeScore(v, polarity))
+  }
+
+  const getMeanByQ = (q: typeof questions[0]): number => {
+    const vals = getNormVals(q)
+    return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : 0
+  }
+  const getSDByQ = (q: typeof questions[0], mean: number): number => {
+    const vals = getNormVals(q)
+    if (vals.length < 2) return 0
+    return Math.round(Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / (vals.length - 1)) * 100) / 100
+  }
+  // 하위 호환용 (key 기반 — positive 문항에만 사용)
   const getMean = (key: string): number => {
     const vals = panelIds.map(pid => responseMap[pid][key]).filter((v): v is number => typeof v === 'number' && v > 0)
     return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : 0
   }
-  const getSD = (key: string, mean: number): number => {
-    const vals = panelIds.map(pid => responseMap[pid][key]).filter((v): v is number => typeof v === 'number' && v > 0)
-    if (vals.length < 2) return 0
-    return Math.round(Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / (vals.length - 1)) * 100) / 100
-  }
   const getCI = (mean: number, sd: number, n: number): [number, number] => {
     if (n < 2) return [mean, mean]
-    // t 임계값 (양측 95% CI)
     const tTable: Record<number, number> = { 2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306, 10: 2.228 }
-    const t = tTable[n] ?? 2.0  // n > 10이면 z ≈ 2.0
+    const t = tTable[n] ?? 2.0
     const se = sd / Math.sqrt(n)
     return [Math.round((mean - t * se) * 100) / 100, Math.round((mean + t * se) * 100) / 100]
   }
 
-  // 6. 전반 만족도·구매의향·추천의향 추출
+  // 6. 전반 만족도·구매의향·추천의향 추출 (정규화 점수 사용)
   const overallQ   = scaleQs.find(q => q.group === 'overall' && !q.key.includes('purchase') && !q.key.includes('recommend') && !ksKeySet.has(q.key))
   const purchaseQ  = scaleQs.find(q => q.group === 'overall' && (q.key.includes('purchase') || q.label.includes('구매')))
   const recommendQ = scaleQs.find(q => q.group === 'overall' && (q.key.includes('recommend') || q.label.includes('추천')))
 
-  // overall 그룹이 없으면 KS/verification 제외한 전체 평균
-  const satKey = overallQ?.key
-  let satMean = satKey ? getMean(satKey) : 0
+  // overall 그룹이 없으면 KS/verification 제외한 전체 평균 (정규화 점수 기준)
+  let satMean = overallQ ? getMeanByQ(overallQ) : 0
   if (!satMean) {
     const nonKsScaleQs = scaleQs.filter(q => !ksKeySet.has(q.key) && q.group !== 'verification')
     const allVals = panelIds.flatMap(pid =>
-      nonKsScaleQs.map(q => responseMap[pid][q.key]).filter((v): v is number => typeof v === 'number' && v > 0)
+      nonKsScaleQs.map(q => {
+        const raw = responseMap[pid][q.key]
+        if (typeof raw !== 'number' || raw <= 0) return null
+        return normalizeScore(raw, resolvePolarity(q))
+      }).filter((v): v is number => v !== null)
     )
     satMean = allVals.length ? Math.round((allVals.reduce((a, b) => a + b, 0) / allVals.length) * 100) / 100 : 3.0
   }
-  const satSD = satKey ? getSD(satKey, satMean) : 0.5
+  const satSD = overallQ ? getSDByQ(overallQ, satMean) : 0.5
   const [satCiL, satCiU] = getCI(satMean, satSD, N)
 
-  const purchaseMean  = purchaseQ ? getMean(purchaseQ.key) : satMean * 0.9
-  const recommendMean = recommendQ ? getMean(recommendQ.key) : satMean * 0.95
+  const purchaseMean  = purchaseQ ? getMeanByQ(purchaseQ) : satMean * 0.9
+  const recommendMean = recommendQ ? getMeanByQ(recommendQ) : satMean * 0.95
+  // 추천의향 Top-2: 정규화 후 3점 이상 (positive 문항 기준) = 원점수 3-4점
   const recommendTop2 = recommendQ
-    ? Math.round(panelIds.filter(pid => (responseMap[pid][recommendQ.key] as number ?? 0) >= 3).length / N * 100) / 100
+    ? Math.round(panelIds.filter(pid => {
+        const raw = responseMap[pid][recommendQ.key] as number ?? 0
+        const norm = normalizeScore(raw, resolvePolarity(recommendQ))
+        return norm >= 3
+      }).length / N * 100) / 100
     : 0.6
 
   // 7. Kill Signal 분석
@@ -141,18 +193,24 @@ async function main() {
     }
   })
 
-  // 8. 항목 분석 (KS / verification 제외)
+  // 8. 항목 분석 (KS / verification 제외) — 정규화 점수 기반
   const analysisQs = scaleQs.filter(q => !ksKeySet.has(q.key) && q.group !== 'verification')
   const itemAnalysis = analysisQs.map(q => {
-    const mean = getMean(q.key)
-    const sd   = getSD(q.key, mean)
+    const polarity = resolvePolarity(q)
+    const mean = getMeanByQ(q)       // 정규화 점수 평균
+    const sd   = getSDByQ(q, mean)
     const [ci_lower, ci_upper] = getCI(mean, sd, N)
-    // Pearson r: 해당 문항 점수와 전반 만족도 점수 간 상관계수
+
+    // Pearson r: 정규화된 해당 문항 점수와 전반 만족도 정규화 점수 간 상관
     let correlation_r = 0
-    if (satKey && satKey !== q.key) {
-      const pairs = panelIds
-        .map(pid => ({ x: responseMap[pid][q.key], y: responseMap[pid][satKey] }))
-        .filter((p): p is { x: number; y: number } => typeof p.x === 'number' && typeof p.y === 'number')
+    if (overallQ && overallQ.key !== q.key) {
+      const satPolarity = resolvePolarity(overallQ)
+      const pairs = panelIds.map(pid => {
+        const rawX = responseMap[pid][q.key]
+        const rawY = responseMap[pid][overallQ.key]
+        if (typeof rawX !== 'number' || typeof rawY !== 'number') return null
+        return { x: normalizeScore(rawX, polarity), y: normalizeScore(rawY, satPolarity) }
+      }).filter((p): p is { x: number; y: number } => p !== null)
       if (pairs.length >= 2) {
         const mx = pairs.reduce((a, p) => a + p.x, 0) / pairs.length
         const my = pairs.reduce((a, p) => a + p.y, 0) / pairs.length
@@ -161,7 +219,6 @@ async function main() {
         correlation_r = den > 0 ? Math.round((num / den) * 100) / 100 : 0
       }
     } else {
-      // 전반 만족도 자체 or satKey 없음: 전체 평균과의 방향성으로 추정
       correlation_r = Math.max(0.1, Math.min(0.99, Math.round(((mean - 1) / 3 + 0.2) * 100) / 100))
     }
     return {
@@ -170,23 +227,28 @@ async function main() {
       correlation_r,
       is_strength: ci_lower >= threshold,
       is_weakness: ci_upper < threshold,
+      polarity,  // 참조용
     }
   })
 
-  // 9. 코호트 분석
+  // 9. 코호트 분석 (정규화 점수 기반)
   const skinTypes = ['건성', '지성', '복합성', '중성', '민감성']
   const cohortAnalysis = skinTypes.map(st => {
     const cohortPanels = panelIds.filter(pid => ppMap[pid]?.skin_type === st)
     if (!cohortPanels.length) return null
-    const avg = (key: string) => {
-      const vals = cohortPanels.map(pid => responseMap[pid][key]).filter((v): v is number => typeof v === 'number')
+    const avgQ = (q: typeof questions[0]) => {
+      const pol = resolvePolarity(q)
+      const vals = cohortPanels.map(pid => {
+        const raw = responseMap[pid][q.key]
+        return typeof raw === 'number' ? normalizeScore(raw, pol) : null
+      }).filter((v): v is number => v !== null)
       return vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : 0
     }
     return {
       skin_type: st,
-      satisfaction: satKey ? avg(satKey) : satMean,
-      purchase: purchaseQ ? avg(purchaseQ.key) : purchaseMean,
-      recommend: recommendQ ? avg(recommendQ.key) : recommendMean,
+      satisfaction: overallQ ? avgQ(overallQ) : satMean,
+      purchase: purchaseQ ? avgQ(purchaseQ) : purchaseMean,
+      recommend: recommendQ ? avgQ(recommendQ) : recommendMean,
       count: cohortPanels.length,
     }
   }).filter(Boolean)

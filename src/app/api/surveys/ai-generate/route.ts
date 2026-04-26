@@ -147,6 +147,7 @@ ${category ? `카테고리: ${category}` : ''}
     "scaleLabels": ["전혀 그렇지 않다", "그렇지 않다", "그렇다", "매우 그렇다"],
     "isKillSignal": false,
     "group": "usage",
+    "polarity": "positive",
     "order": 1
   }
 ]
@@ -158,8 +159,15 @@ group 값은 아래 5가지만 사용하세요 (그 외 값은 절대 사용 금
 - "claim_risk" : Claim Risk — 광고 문구·마케팅 주장 검증 (예: "24시간 지속", "피부 장벽 강화" 등)
 - "overall"    : 종합평가 — 전반적 만족도, 구매의향, 추천의향, 재구매의향, 가성비
 
+polarity 규칙 (반드시 설정):
+- "positive": 높은 점수일수록 좋음 — ex) "발림성이 좋다", "보습이 잘 된다", "만족한다"
+- "negative": 낮은 점수일수록 좋음 — ex) "따가움을 느꼈다", "끈적임이 심하다", "건조함을 느꼈다"
+- Kill Signal 문항(group="killsignal")은 반드시 "negative"
+- 부정적 경험·불편·이상반응을 묻는 문항은 반드시 "negative"
+- 긍정적 경험·효과·만족을 묻는 문항은 "positive"
+
 isKillSignal: Kill Signal 문항(group="killsignal")만 true, 나머지는 반드시 false
-type이 "text"인 경우 scale·scaleLabels 필드 생략
+type이 "text"인 경우 scale·scaleLabels·polarity 필드 생략
 type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
         },
       ],
@@ -261,6 +269,10 @@ type이 "choice"인 경우 choices 배열 추가, scale·scaleLabels 생략`,
         type,
         group,
         isKillSignal: group === 'killsignal' ? true : (q.isKillSignal ?? false),
+        // polarity: AI가 설정하거나, KS 그룹이면 항상 negative, 나머지는 AI 값 또는 undefined
+        polarity: group === 'killsignal'
+          ? 'negative'
+          : (q.polarity === 'positive' || q.polarity === 'negative') ? q.polarity : undefined,
       }
       if (type === 'scale') {
         return {

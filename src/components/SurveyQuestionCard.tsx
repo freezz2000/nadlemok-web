@@ -2,6 +2,7 @@
 
 import Card from '@/components/ui/Card'
 import { QUESTION_GROUPS, DEFAULT_SCALE_LABELS } from '@/lib/template-constants'
+import { detectPolarityFromLabel } from '@/lib/survey-analysis'
 import type { SurveyQuestion, QuestionGroup } from '@/lib/types'
 
 export interface SurveyQuestionCardProps {
@@ -71,6 +72,8 @@ export default function SurveyQuestionCard({
                   key: group === 'killsignal' && !q.key.startsWith('KS_')
                     ? `KS_${q.key}`
                     : q.key.replace(/^KS_/, ''),
+                  // KS 그룹으로 변경 시 polarity 자동 negative 설정
+                  ...(group === 'killsignal' ? { polarity: 'negative' as const } : {}),
                 })
               }}
               className="px-2 py-1 border border-border rounded text-xs focus:outline-none focus:ring-2 focus:ring-navy/20"
@@ -88,6 +91,33 @@ export default function SurveyQuestionCard({
               <option value="text">주관식</option>
               <option value="choice">객관식</option>
             </select>
+
+            {/* 극성 토글 — scale 문항만 표시 */}
+            {q.type === 'scale' && (() => {
+              // 명시 설정이 없으면 키워드 자동감지 값을 기본으로 표시
+              const autoDetected = detectPolarityFromLabel(q.label)
+              const effective = q.polarity ?? autoDetected
+              const isNeg = effective === 'negative'
+              const isAuto = !q.polarity  // 아직 수동 설정 안 됨
+              return (
+                <button
+                  type="button"
+                  title={isAuto ? '클릭하여 수동 전환 (현재 자동감지)' : '클릭하여 극성 전환'}
+                  onClick={() => onUpdate(index, {
+                    polarity: effective === 'negative' ? 'positive' : 'negative',
+                  })}
+                  className={`text-xs px-2 py-0.5 rounded border flex items-center gap-1 transition-colors ${
+                    isNeg
+                      ? 'border-nogo/30 bg-nogo-bg text-nogo hover:border-nogo/60'
+                      : 'border-go/30 bg-go-bg text-go hover:border-go/60'
+                  }`}
+                >
+                  {isNeg ? '↓ 부정' : '↑ 긍정'}
+                  {isAuto && <span className="opacity-60">(자동)</span>}
+                </button>
+              )
+            })()}
+
             {q.type === 'scale' && (
               <button
                 onClick={() => onToggleExpand(q.key)}

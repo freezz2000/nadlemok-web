@@ -76,6 +76,13 @@ export interface SurveyQuestion {
   isKillSignal: boolean
   group?: QuestionGroup
   order: number
+  /**
+   * 문항 극성 (점수 해석 방향)
+   * - 'positive': 높을수록 좋음 (기본값) — ex) "발림성이 좋다", "만족한다"
+   * - 'negative': 낮을수록 좋음      — ex) "따가움을 느꼈다", "끈적임이 심하다"
+   * KS 문항(isKillSignal=true)은 polarity 값과 무관하게 항상 negative로 처리됨.
+   */
+  polarity?: 'positive' | 'negative'
 }
 
 export interface SurveyTemplate {
