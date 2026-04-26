@@ -25,6 +25,7 @@ export default function SurveyResponsePage() {
   const [existingResponseId, setExistingResponseId] = useState<string | null>(null)
   const [isReadOnly, setIsReadOnly] = useState(false)
   const [isNotStarted, setIsNotStarted] = useState(false)  // 설문 미시작 (draft)
+  const [projectStatus, setProjectStatus] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [saved, setSaved] = useState(false)
   const startTime = useRef(Date.now())
@@ -47,8 +48,9 @@ export default function SurveyResponsePage() {
     }
 
     // 분석 단계 이후는 읽기 전용
-    const projectStatus = (surveyData as unknown as { project: { status: string } })?.project?.status
-    if (surveyData?.status === 'closed' || projectStatus === 'analyzing' || projectStatus === 'completed') {
+    const ps = (surveyData as unknown as { project: { status: string } })?.project?.status
+    setProjectStatus(ps ?? null)
+    if (surveyData?.status === 'closed' || ps === 'analyzing' || ps === 'analyzed' || ps === 'completed') {
       setIsReadOnly(true)
     }
 
@@ -204,7 +206,19 @@ export default function SurveyResponsePage() {
 
       {isReadOnly && (
         <Card className="mb-6" padding="sm">
-          <p className="text-sm text-text-muted text-center">분석이 진행 중이므로 응답을 수정할 수 없습니다.</p>
+          {projectStatus === 'completed' ? (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-text-muted">분석이 완료되었습니다. 결과를 확인하세요.</p>
+              <a
+                href={`/panel/surveys/${id}/result`}
+                className="flex-shrink-0 ml-4 text-sm font-medium text-navy hover:underline"
+              >
+                결과 보기 →
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted text-center">분석이 진행 중이므로 응답을 수정할 수 없습니다.</p>
+          )}
         </Card>
       )}
 

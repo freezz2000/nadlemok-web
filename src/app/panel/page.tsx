@@ -156,18 +156,24 @@ function SurveyItem({ m }: { m: Record<string, unknown> }) {
 function CompletedItem({ m }: { m: Record<string, unknown> }) {
   const survey = m.survey as {
     id: string; title: string
-    project?: { product_name: string }
+    project?: { product_name: string; panel_source: string }
   } | null
 
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border last:border-0">
+    <Link
+      href={`/panel/surveys/${survey?.id}/result`}
+      className="flex items-center justify-between py-2 border-b border-border last:border-0 hover:bg-surface/50 rounded-lg px-2 -mx-2 transition-colors"
+    >
       <div className="min-w-0">
         <p className="text-sm text-text truncate">{survey?.title}</p>
         {survey?.project?.product_name && (
           <p className="text-xs text-text-muted mt-0.5">{survey.project.product_name}</p>
         )}
       </div>
-      <MatchStatusBadge status="completed" />
-    </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <MatchStatusBadge status="completed" />
+        <span className="text-xs text-navy">결과 보기 →</span>
+      </div>
+    </Link>
   )
 }
