@@ -83,6 +83,10 @@ export default function PanelSetupPage() {
     load().catch(() => {})
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 크레딧 충분 여부
+  const creditsNeeded = selected === 'external' ? externalCount : 0
+  const hasEnoughCredits = creditBalance !== null && creditBalance >= creditsNeeded
+
   function toggleItem(arr: string[], val: string, setter: (v: string[]) => void) {
     setter(arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val])
   }
@@ -382,7 +386,24 @@ export default function PanelSetupPage() {
             </div>
           </label>
 
-          {/* 예상 견적 / 크레딧 / 구독 플랜 — 숨김 처리 */}
+          {/* 크레딧 잔액 확인 */}
+          <div className={`rounded-xl border p-4 ${hasEnoughCredits ? 'border-go/30 bg-go/5' : 'border-nogo/30 bg-nogo/5'}`}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-semibold text-text">크레딧 잔액</span>
+              <span className={`text-xl font-black ${hasEnoughCredits ? 'text-go' : 'text-nogo'}`}>
+                {creditBalance ?? '—'} <span className="text-sm font-normal">cr</span>
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-text-muted">
+              <span>이번 검증에 필요한 크레딧</span>
+              <span className="font-semibold">{creditsNeeded} cr</span>
+            </div>
+            {!hasEnoughCredits && creditBalance !== null && (
+              <p className="text-xs text-nogo mt-1.5 font-medium">
+                {creditsNeeded - creditBalance}cr 부족합니다. 크레딧을 충전해주세요.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
