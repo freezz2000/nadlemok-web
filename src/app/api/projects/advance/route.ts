@@ -66,13 +66,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: projErr.message }, { status: 500 })
     }
 
-    // 내부 패널: 설문 활성화 (테스트 시작)
-    if (isInternal) {
-      await admin
-        .from('surveys')
-        .update({ status: 'active' })
-        .eq('project_id', projectId)
-    }
+    // 내부 패널: 설문은 여기서 활성화하지 않음
+    // → 초대 페이지에서 패널을 선택한 뒤 "설문 시작하기" 버튼으로 별도 활성화
+    // (외부 패널도 동일 — 관리자가 매칭 후 별도 처리)
 
     return NextResponse.json({ ok: true, nextStatus })
   } catch (err) {

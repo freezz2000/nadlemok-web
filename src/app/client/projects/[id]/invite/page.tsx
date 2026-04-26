@@ -731,18 +731,23 @@ export default function InvitePage() {
         )}
       </Card>
 
-      {/* 설문 시작 버튼 */}
-      {surveyId && surveyStatus !== 'active' && totalAccepted > 0 && (
+      {/* 설문 시작 카드 — 항상 표시 (설문이 있고 아직 활성화 전) */}
+      {surveyId && surveyStatus !== 'active' && (
         <Card className="border-navy/20 bg-navy/[0.02]">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-navy">설문을 시작할 준비가 됐나요?</p>
+              <p className="text-sm font-semibold text-navy">설문 시작하기</p>
               <p className="text-xs text-text-muted mt-1">
-                선택된 패널 {selectedAssignment.size}명이 설문에 응답할 수 있습니다.
-                {pendingCount > 0 && ` (아직 미가입 ${pendingCount}명)`}
+                {selectedAssignment.size > 0
+                  ? `선택된 패널 ${selectedAssignment.size}명에게 설문이 발송됩니다.${pendingCount > 0 ? ` (아직 미가입 ${pendingCount}명)` : ''}`
+                  : '위 패널 선택 섹션에서 설문에 참여할 패널을 선택한 뒤 저장하세요.'}
               </p>
             </div>
-            <Button onClick={handleStartSurvey} loading={startingsurvey}>
+            <Button
+              onClick={handleStartSurvey}
+              loading={startingsurvey}
+              disabled={selectedAssignment.size === 0}
+            >
               설문 시작하기
             </Button>
           </div>

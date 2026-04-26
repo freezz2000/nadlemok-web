@@ -666,15 +666,24 @@ export default function ClientProjectDetailPage() {
             </div>
 
             {/* 저장 / 확정 */}
-            <div className="flex items-center gap-3 pt-3 border-t border-border">
-              <Button variant="secondary" onClick={saveDraft} loading={saving} disabled={questions.length === 0}>
-                임시 저장
-              </Button>
-              <Button onClick={advanceSurvey} loading={confirming} disabled={questions.length === 0}>
-                {isInternal ? '설문 완료 — 테스트 시작' : '설문 완료 — 패널 모집 시작'}
-              </Button>
-              {questions.length === 0 && (
-                <span className="text-xs text-text-muted">문항이 있어야 확정할 수 있습니다</span>
+            <div className="flex flex-col gap-3 pt-3 border-t border-border">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button variant="secondary" onClick={saveDraft} loading={saving} disabled={questions.length === 0}>
+                  설문 저장
+                </Button>
+                <Button onClick={advanceSurvey} loading={confirming} disabled={questions.length === 0}>
+                  {isInternal ? '설문 확정 — 패널 초대하기 →' : '설문 확정 — 패널 모집 시작'}
+                </Button>
+                {questions.length === 0 && (
+                  <span className="text-xs text-text-muted">문항이 있어야 확정할 수 있습니다</span>
+                )}
+              </div>
+              {questions.length > 0 && (
+                <p className="text-xs text-text-muted leading-relaxed">
+                  💡 <span className="font-medium">설문 저장</span>: 문항을 저장하고 계속 수정할 수 있습니다.&nbsp;
+                  <span className="font-medium">설문 확정</span>: 저장 후 패널 초대 단계로 이동합니다.
+                  초대 페이지에서 패널을 선택하고 <span className="font-medium">설문 시작하기</span>로 테스트를 시작하세요.
+                </p>
               )}
             </div>
           </Card>
