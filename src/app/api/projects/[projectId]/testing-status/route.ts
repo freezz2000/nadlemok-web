@@ -48,6 +48,9 @@ export async function GET(
     return NextResponse.json({ survey: null, panels: [], responded_count: 0, total_count: 0 })
   }
 
+  const questions: { key: string; label: string; type: string; group?: string; isKillSignal?: boolean; scaleLabels?: string[]; choices?: string[] }[]
+    = Array.isArray(survey.questions) ? survey.questions : []
+
   // survey_panels 조회
   const { data: sp } = await admin
     .from('survey_panels')
@@ -62,7 +65,8 @@ export async function GET(
       survey: {
         id: survey.id,
         status: survey.status,
-        questions_count: Array.isArray(survey.questions) ? survey.questions.length : 0,
+        questions_count: questions.length,
+        questions,
       },
       panels: [],
       responded_count: 0,
@@ -70,11 +74,13 @@ export async function GET(
     })
   }
 
-  // 패널 이름 + 프로필 병렬 조회
+  // 패널 이름 + 프로필 + 응답 병렬 조회
   const [{ data: profiles }, { data: panelProfiles }, { data: responses }] = await Promise.all([
     admin.from('profiles').select('id, name').in('id', panelIds),
     admin.from('panel_profiles').select('id, gender, age_group, skin_type, skin_concern').in('id', panelIds),
-    admin.from('survey_responses').select('panel_id').eq('survey_id', survey.id),
+    admin.from('survey_responses')
+      .select('panel_id, responses, open_weakness, open_improvement, responded_at, response_duration_sec, day_checkpoint')
+      .eq('survey_id', survey.id),
   ])
 
   const nameMap: Record<string, string> = {}
@@ -90,28 +96,68 @@ export async function GET(
     }
   }
 
-  const respondedSet = new Set((responses ?? []).map((r: { panel_id: string }) => r.panel_id))
+  // panel_id별로 가장 최근 checkpoint 응답만 보관
+  const responseMap: Record<string, {
+    responses: Record<string, number | string>
+    open_weakness: string | null
+    open_improvement: string | null
+    responded_at: string | null
+    response_duration_sec: number | null
+    day_checkpoint: number
+  }> = {}
 
-  const panels = panelRows.map((sp: { panel_id: string; status: string; matched_at: string }) => ({
-    panel_id: sp.panel_id,
-    name: nameMap[sp.panel_id] || '이름 미등록',
-    gender: ppMap[sp.panel_id]?.gender ?? '-',
-    age_group: ppMap[sp.panel_id]?.age_group ?? '-',
-    skin_type: ppMap[sp.panel_id]?.skin_type ?? '-',
-    skin_concern: ppMap[sp.panel_id]?.skin_concern ?? '-',
-    matched_at: sp.matched_at,
-    status: sp.status,
-    has_responded: respondedSet.has(sp.panel_id),
-  }))
+  for (const r of (responses ?? [])) {
+    const pid = r.panel_id as string
+    const ckpt = (r.day_checkpoint as number) ?? 1
+    if (!responseMap[pid] || ckpt > responseMap[pid].day_checkpoint) {
+      responseMap[pid] = {
+        responses: (r.responses as Record<string, number | string>) || {},
+        open_weakness: (r.open_weakness as string) || null,
+        open_improvement: (r.open_improvement as string) || null,
+        responded_at: (r.responded_at as string) || null,
+        response_duration_sec: (r.response_duration_sec as number) || null,
+        day_checkpoint: ckpt,
+      }
+    }
+  }
+
+  const scaleQs = questions.filter(q => q.type === 'scale')
+
+  const panels = panelRows.map((row: { panel_id: string; status: string; matched_at: string }) => {
+    const resp = responseMap[row.panel_id]
+    const scaleValues = resp
+      ? Object.values(resp.responses || {}).filter((v): v is number => typeof v === 'number')
+      : []
+    const avgScore = scaleValues.length > 0
+      ? Math.round((scaleValues.reduce((a, b) => a + b, 0) / scaleValues.length) * 100) / 100
+      : null
+
+    return {
+      panel_id: row.panel_id,
+      name: nameMap[row.panel_id] || '이름 미등록',
+      gender: ppMap[row.panel_id]?.gender ?? '-',
+      age_group: ppMap[row.panel_id]?.age_group ?? '-',
+      skin_type: ppMap[row.panel_id]?.skin_type ?? '-',
+      skin_concern: ppMap[row.panel_id]?.skin_concern ?? '-',
+      matched_at: row.matched_at,
+      status: row.status,
+      has_responded: !!resp,
+      avg_score: avgScore,
+      answered_count: resp ? Object.keys(resp.responses || {}).length : 0,
+      total_questions: scaleQs.length,
+      response: resp || null,
+    }
+  })
 
   return NextResponse.json({
     survey: {
       id: survey.id,
       status: survey.status,
-      questions_count: Array.isArray(survey.questions) ? survey.questions.length : 0,
+      questions_count: questions.length,
+      questions,
     },
     panels,
-    responded_count: respondedSet.size,
+    responded_count: Object.keys(responseMap).length,
     total_count: panels.length,
   })
 }
