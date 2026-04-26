@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { loadTossPayments } from '@tosspayments/tosspayments-sdk'
 import Card, { CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Link from 'next/link'
@@ -58,8 +59,12 @@ export default function InvitePage() {
   const [savingAssignment, setSavingAssignment] = useState(false)
   const [assignSaved, setAssignSaved] = useState(false)
 
+  // 배송 대행
+  const [deliveryService, setDeliveryService] = useState(false)
+
   // 설문 시작
   const [startingsurvey, setStartingSurvey] = useState(false)
+  const [paying, setPaying] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
 
   // ── 데이터 로드 ─────────────────────────────────────────
@@ -69,13 +74,16 @@ export default function InvitePage() {
     const { data: { user } } = await supabase.auth.getUser()
     const clientId = user?.id
 
-    // 프로젝트명
+    // 프로젝트명 + 배송 대행 여부
     const { data: proj } = await supabase
       .from('projects')
-      .select('product_name')
+      .select('product_name, delivery_service')
       .eq('id', projectId)
       .single()
-    if (proj) setProductName(proj.product_name)
+    if (proj) {
+      setProductName(proj.product_name)
+      setDeliveryService(proj.delivery_service ?? false)
+    }
 
     // 초대 링크
     if (!projectInviteLink) {
@@ -241,8 +249,16 @@ export default function InvitePage() {
 
   async function handleStartSurvey() {
     if (!surveyId) return
-    setStartingSurvey(true)
     setStartError(null)
+
+    // 배송 대행 신청 시 → TossPayments 결제 후 시작
+    if (deliveryService) {
+      await handleDeliveryPayment()
+      return
+    }
+
+    // 일반 시작
+    setStartingSurvey(true)
     try {
       const res = await fetch('/api/surveys/start', {
         method: 'POST',
@@ -256,6 +272,38 @@ export default function InvitePage() {
       setStartError(e instanceof Error ? e.message : '오류가 발생했습니다')
     } finally {
       setStartingSurvey(false)
+    }
+  }
+
+  async function handleDeliveryPayment() {
+    if (!surveyId) return
+    setPaying(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('로그인이 필요합니다')
+
+      const panelCount = selectedAssignment.size
+      const amount = panelCount * 10_000
+      const orderId = `delivery-${projectId}-${Date.now()}`
+
+      // 결제 후 복귀를 위한 정보 저장
+      localStorage.setItem('pending_delivery_payment', JSON.stringify({ projectId, surveyId }))
+
+      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!
+      const tossPayments = await loadTossPayments(clientKey)
+      const payment = tossPayments.payment({ customerKey: `nc-${user.id}` })
+
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: { value: amount, currency: 'KRW' },
+        orderId,
+        orderName: `샘플 배송 대행료 (${panelCount}명 × 10,000원)`,
+        successUrl: `${window.location.origin}/payment/delivery-success`,
+        failUrl: `${window.location.origin}/client/projects/${projectId}/invite`,
+      })
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : '결제 오류가 발생했습니다')
+      setPaying(false)
     }
   }
 
@@ -470,13 +518,19 @@ export default function InvitePage() {
                   ? `선택된 패널 ${selectedAssignment.size}명에게 설문이 발송됩니다.`
                   : '위 패널 목록에서 설문에 참여할 패널을 선택한 뒤 저장하세요.'}
               </p>
+              {deliveryService && selectedAssignment.size > 0 && (
+                <p className="text-xs text-amber-600 font-medium mt-1.5">
+                  배송 대행료 결제 필요 · {(selectedAssignment.size * 10_000).toLocaleString('ko-KR')}원
+                  <span className="text-text-muted font-normal ml-1">({selectedAssignment.size}명 × 10,000원)</span>
+                </p>
+              )}
             </div>
             <Button
               onClick={handleStartSurvey}
-              loading={startingsurvey}
+              loading={startingsurvey || paying}
               disabled={selectedAssignment.size === 0}
             >
-              설문 시작하기
+              {deliveryService ? '결제 후 시작하기' : '설문 시작하기'}
             </Button>
           </div>
           {startError && <p className="text-xs text-nogo mt-3">{startError}</p>}
