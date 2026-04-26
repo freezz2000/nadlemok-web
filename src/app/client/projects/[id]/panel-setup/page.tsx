@@ -374,15 +374,24 @@ export default function PanelSetupPage() {
               onChange={e => setDeliveryService(e.target.checked)}
               className="mt-0.5 w-4 h-4 accent-navy"
             />
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-text text-sm">샘플 배송 대행 신청</p>
               <p className="text-xs text-text-muted mt-0.5">
                 고객사 → 나들목 → 패널로 소분 배송
-                <span className="ml-2 text-amber-600 font-medium">+1,000원/인</span>
+                <span className="ml-2 text-amber-600 font-medium">+10,000원/인</span>
               </p>
               <p className="text-xs text-text-muted mt-0.5">
                 미선택 시 패널 주소 목록 제공 · 고객사 직접 발송
               </p>
+              {deliveryService && (
+                <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                  <span className="text-xs text-text-muted">배송 대행료 합계</span>
+                  <span className="text-sm font-bold text-amber-600">
+                    {(externalCount * 10_000).toLocaleString('ko-KR')}원
+                    <span className="text-xs font-normal text-text-muted ml-1">({externalCount}명 × 10,000원)</span>
+                  </span>
+                </div>
+              )}
             </div>
           </label>
 
