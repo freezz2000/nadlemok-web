@@ -206,9 +206,11 @@ export default function SurveyResponsePage() {
 
       {isReadOnly && (
         <Card className="mb-6" padding="sm">
-          {projectStatus === 'completed' ? (
+          {(projectStatus === 'completed' || projectStatus === 'analyzed') ? (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-muted">분석이 완료되었습니다. 결과를 확인하세요.</p>
+              <p className="text-sm text-text-muted">
+                {projectStatus === 'completed' ? '분석이 완료되었습니다.' : '분석 완료 — 전문가 검토 중입니다.'}
+              </p>
               <a
                 href={`/panel/surveys/${id}/result`}
                 className="flex-shrink-0 ml-4 text-sm font-medium text-navy hover:underline"

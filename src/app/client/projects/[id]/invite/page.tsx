@@ -170,7 +170,8 @@ export default function InvitePage() {
       const assignedIds = new Set<string>()
 
       rows.forEach((sp) => {
-        responseM[sp.panel_id] = sp.status === 'completed'
+        // 패널이 응답 제출 시 'accepted', 분석 완료 후 'completed' — 둘 다 응답완료로 처리
+        responseM[sp.panel_id] = sp.status === 'accepted' || sp.status === 'completed'
         assignedIds.add(sp.panel_id)
       })
 

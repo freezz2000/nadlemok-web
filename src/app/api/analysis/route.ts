@@ -30,16 +30,20 @@ export async function POST(request: Request) {
     core_usp,
     max_penalty,
     recommended_action,
+    key_drivers,
+    rd_guide,
+    marketing_guide,
+    next_steps,
   } = body
 
   if (!project_id || !verdict) {
     return NextResponse.json({ error: 'project_id and verdict are required' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  // 기존 분석 결과 삭제 후 저장 (재분석 지원)
+  await admin.from('analysis_results').delete().eq('project_id', project_id)
 
-  // 분석 결과 저장
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('analysis_results')
     .insert({
       project_id,
@@ -53,6 +57,10 @@ export async function POST(request: Request) {
       core_usp,
       max_penalty,
       recommended_action,
+      key_drivers,
+      rd_guide,
+      marketing_guide,
+      next_steps,
     })
     .select()
     .single()
@@ -61,11 +69,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // 프로젝트 상태를 completed로 업데이트
-  await supabase
+  // 프로젝트 → analyzed (관리자 검토 대기), 설문 → closed
+  await admin
     .from('projects')
-    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .update({ status: 'analyzed' })
     .eq('id', project_id)
+
+  await admin
+    .from('surveys')
+    .update({ status: 'closed' })
+    .eq('project_id', project_id)
 
   // 분석 완료 알림톡 — 클라이언트 전화번호 조회 후 발송
   try {

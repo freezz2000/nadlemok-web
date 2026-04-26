@@ -52,7 +52,7 @@ async function main() {
   // 1. 프로젝트 조회
   const { data: project, error: projErr } = await admin
     .from('projects')
-    .select('id, product_name, status, satisfaction_threshold')
+    .select('id, product_name, status, satisfaction_threshold, ks_warn_threshold, ks_danger_threshold')
     .eq('id', projectId)
     .single()
   if (projErr || !project) { console.error('❌ 프로젝트 없음', projErr); process.exit(1) }
@@ -110,6 +110,10 @@ async function main() {
   const ksQuestions = scaleQs.filter(q => q.isKillSignal || q.group === 'killsignal')
   const ksKeySet = new Set(ksQuestions.map(q => q.key))
   const threshold = (project.satisfaction_threshold as number) ?? 3.0
+  // 프로젝트별 KS 임계값 (관리자 설정값 우선, 없으면 기본값 5%/10%)
+  const ksWarnThreshold  = (project.ks_warn_threshold  as number) ?? 0.05
+  const ksDangerThreshold = (project.ks_danger_threshold as number) ?? 0.10
+  console.log(`⚙️  KS 임계값: Warning≥${Math.round(ksWarnThreshold*100)}% / Danger≥${Math.round(ksDangerThreshold*100)}%  (만족도 기준: ${threshold})`)
 
   // 정규화된 점수 배열 반환 (polarity 반영)
   const getNormVals = (q: typeof questions[0]): number[] => {
@@ -180,7 +184,7 @@ async function main() {
     const scores    = panelIds.map(pid => (responseMap[pid][q.key] as number) ?? 1)
     const triggered = scores.filter(s => s >= 3).length  // 3점 이상 = 부작용 체감
     const ratio     = Math.round((triggered / N) * 100) / 100
-    const level     = ratio >= 0.35 ? 'danger' : ratio >= 0.15 ? 'warning' : 'safe'
+    const level     = ratio >= ksDangerThreshold ? 'danger' : ratio >= ksWarnThreshold ? 'warning' : 'safe'
     console.log(`   KS [${level}] ${q.label}: ${triggered}/${N}명 반응 (${Math.round(ratio * 100)}%)`)
     return {
       name: q.label,
