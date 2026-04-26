@@ -45,6 +45,7 @@ export function StatusBadge({ status }: { status: ProjectStatus }) {
     matching: { variant: 'info', label: '패널 모집 중' },
     testing: { variant: 'warning', label: '테스트 진행 중' },
     analyzing: { variant: 'info', label: '분석 중' },
+    analyzed: { variant: 'warning', label: '검토 대기' },
     completed: { variant: 'go', label: '리포트 완료' },
     rejected: { variant: 'nogo', label: '반려' },
   }

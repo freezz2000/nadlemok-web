@@ -194,6 +194,8 @@ export default function ResultsPage() {
   const [satThreshold, setSatThreshold] = useState(3.0)
   const [panelSource, setPanelSource] = useState<'internal' | 'external' | 'mixed'>('internal')
   const [userId, setUserId] = useState<string | null>(null)
+  const [projectStatus, setProjectStatus] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [id])
 
@@ -203,14 +205,58 @@ export default function ResultsPage() {
 
     const [{ data: analysis }, { data: project }] = await Promise.all([
       supabase.from('analysis_results').select('*').eq('project_id', id).single(),
-      supabase.from('projects').select('product_name, panel_size, satisfaction_threshold, panel_source').eq('id', id).single(),
+      supabase.from('projects').select('product_name, panel_size, satisfaction_threshold, panel_source, status').eq('id', id).single(),
     ])
-    setResult(analysis)
+    setProjectStatus(project?.status || null)
     setProductName(project?.product_name || '')
     setPanelSize(project?.panel_size || 50)
     setSatThreshold(project?.satisfaction_threshold ?? 3.0)
     setPanelSource((project?.panel_source as 'internal' | 'external' | 'mixed') || 'internal')
+    setResult(analysis)
+    setLoading(false)
+  }
 
+  // 로딩 중
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto text-center py-20">
+        <div className="w-12 h-12 border-4 border-navy/20 border-t-navy rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-text-muted text-sm">분석 결과를 불러오는 중입니다...</p>
+        <Link href={`/client/projects/${id}`} className="text-navy hover:underline text-sm mt-3 inline-block">
+          프로젝트로 돌아가기
+        </Link>
+      </div>
+    )
+  }
+
+  // analyzed 상태: 관리자 검토 중 — 아직 공개되지 않음
+  if (projectStatus === 'analyzed') {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-24 px-4">
+        <div className="w-20 h-20 rounded-full bg-amber-50 border-2 border-amber-200 flex items-center justify-center mx-auto mb-6">
+          <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-text mb-3">분석 완료 — 검토 중</h2>
+        <p className="text-text-muted text-sm leading-relaxed mb-2">
+          분석이 완료되어 현재 나들목 전문가가 결과를 검토 중입니다.
+        </p>
+        <p className="text-text-muted text-sm leading-relaxed mb-8">
+          검토가 완료되면 이 페이지에서 전체 리포트를 확인할 수 있습니다.
+          보통 <span className="font-semibold text-text">1~2 영업일</span> 이내에 공개됩니다.
+        </p>
+        <Link
+          href={`/client/projects/${id}`}
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white text-sm font-medium rounded-lg hover:bg-navy/90 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          프로젝트로 돌아가기
+        </Link>
+      </div>
+    )
   }
 
   if (!result) {

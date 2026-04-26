@@ -206,8 +206,8 @@ export default function ProjectDetailPage() {
       setTestingAvailablePanels((allPanels as unknown as AvailablePanel[]) || [])
     }
 
-    // analyzing/completed 상태: 전체 응답 로드 + 패널 섹션 접기
-    if ((proj?.status === 'analyzing' || proj?.status === 'completed') && survs?.length) {
+    // analyzing/analyzed/completed 상태: 전체 응답 로드 + 패널 섹션 접기
+    if ((proj?.status === 'analyzing' || proj?.status === 'analyzed' || proj?.status === 'completed') && survs?.length) {
       const surveyId = survs[0].id
       const { data: responses } = await supabase
         .from('survey_responses')
@@ -477,7 +477,12 @@ export default function ProjectDetailPage() {
   }
 
   async function updateStatus(newStatus: string) {
-    await supabase.from('projects').update({ status: newStatus }).eq('id', id)
+    const update: Record<string, unknown> = { status: newStatus }
+    // 보고서 승인(analyzed→completed) 시 완료 타임스탬프 기록
+    if (newStatus === 'completed') {
+      update.completed_at = new Date().toISOString()
+    }
+    await supabase.from('projects').update(update).eq('id', id)
 
     // testing 시작 시 설문도 active로 변경
     if (newStatus === 'testing' && surveys.length > 0) {
@@ -500,6 +505,7 @@ export default function ProjectDetailPage() {
     { from: 'matching', to: 'testing', label: '매칭 완료 → 테스트 시작' },
     { from: 'testing', to: 'analyzing', label: '분석 시작' },
     { from: 'analyzing', to: 'completed', label: '완료 처리' },
+    { from: 'analyzed', to: 'completed', label: '보고서 승인' },
   ]
   const nextStatus = statusFlow.find((s) => s.from === project.status)
   const canReject = project.status === 'pending'
@@ -523,7 +529,16 @@ export default function ProjectDetailPage() {
           </Button>
         )}
         {nextStatus && (
-          <Button size="sm" onClick={() => updateStatus(nextStatus.to)}>
+          <Button
+            size="sm"
+            variant={nextStatus.from === 'analyzed' ? 'primary' : 'secondary'}
+            onClick={() => updateStatus(nextStatus.to)}
+          >
+            {nextStatus.from === 'analyzed' && (
+              <svg className="w-4 h-4 mr-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
             {nextStatus.label}
           </Button>
         )}
@@ -661,7 +676,7 @@ export default function ProjectDetailPage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <CardTitle>설문</CardTitle>
-          {project.status !== 'confirmed' && project.status !== 'approved' && project.status !== 'recruiting' && project.status !== 'testing' && project.status !== 'analyzing' && project.status !== 'completed' && (
+          {project.status !== 'confirmed' && project.status !== 'approved' && project.status !== 'recruiting' && project.status !== 'testing' && project.status !== 'analyzing' && project.status !== 'analyzed' && project.status !== 'completed' && (
             <Button size="sm" variant="secondary" onClick={() => setShowCreateSurvey(true)}>설문 추가</Button>
           )}
         </div>
@@ -1048,7 +1063,7 @@ export default function ProjectDetailPage() {
       {/* 매칭된 패널 목록 — recruiting 외 상태에서 조회용 */}
       {project.status !== 'recruiting' && matchedPanels.length > 0 && (() => {
         const isTesting = project.status === 'testing'
-        const isAnalyzing = project.status === 'analyzing' || project.status === 'completed'
+        const isAnalyzing = project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed'
 
         // 전체 설문 진행률 계산 (1회 이상 응답한 패널 수)
         const respondedCount = isTesting
@@ -1351,8 +1366,8 @@ export default function ProjectDetailPage() {
         )
       })()}
 
-      {/* 분석 결과 — analyzing/completed 상태 */}
-      {(project.status === 'analyzing' || project.status === 'completed') && surveys.length > 0 && (() => {
+      {/* 분석 결과 — analyzing/analyzed/completed 상태 */}
+      {(project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed') && surveys.length > 0 && (() => {
         const analysis = computeAnalysis()
         if (!analysis) {
           return (
@@ -1386,6 +1401,27 @@ export default function ProjectDetailPage() {
 
         return (
           <div className="mt-6 space-y-4">
+            {/* analyzed 상태: 승인 대기 배너 */}
+            {project.status === 'analyzed' && (
+              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">분석 완료 — 보고서 승인 대기 중</p>
+                    <p className="text-xs text-amber-700 mt-0.5">아래 결과를 검토 후 "보고서 승인" 버튼을 클릭하면 고객에게 공개됩니다.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => updateStatus('completed')}
+                  className="flex-shrink-0 px-4 py-2 bg-go text-white text-sm font-semibold rounded-lg hover:bg-go/90 transition-colors"
+                >
+                  보고서 승인
+                </button>
+              </div>
+            )}
+
             {/* 판정 배너 */}
             <div className={`p-5 rounded-xl border ${verdictStyle.bg} ${verdictStyle.border}`}>
               <div className="flex items-center justify-between mb-4">
@@ -1638,8 +1674,8 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
 
-              {/* 설문 응답 보기 버튼 — testing/analyzing/completed 상태일 때만 */}
-              {(project.status === 'testing' || project.status === 'analyzing' || project.status === 'completed') && surveys.length > 0 && (
+              {/* 설문 응답 보기 버튼 — testing/analyzing/analyzed/completed 상태일 때만 */}
+              {(project.status === 'testing' || project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed') && surveys.length > 0 && (
                 <>
                   <hr className="border-border" />
                   <button

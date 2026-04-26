@@ -386,6 +386,7 @@ export default function ClientProjectDetailPage() {
   const isMatching = project.status === 'matching' || project.status === 'recruiting'
   const isTesting = project.status === 'testing'
   const isAnalyzing = project.status === 'analyzing'
+  const isAnalyzed = project.status === 'analyzed'
   const isCompleted = project.status === 'completed'
   const isInternal = project.panel_source === 'internal'
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId)
@@ -418,6 +419,7 @@ export default function ClientProjectDetailPage() {
         confirmed: 1, approved: 1,
         testing: 2,
         analyzing: 4,
+        analyzed: 4,
         completed: 5,
       }
     : {
@@ -427,6 +429,7 @@ export default function ClientProjectDetailPage() {
         matching: 2,  recruiting: 2,
         testing: 3,
         analyzing: 5,
+        analyzed: 5,
         completed: 6,
       }
   const currentIdx = statusToIndex[project.status] ?? 0
@@ -530,6 +533,22 @@ export default function ClientProjectDetailPage() {
         {isAnalyzing && (
           <div className="mt-4 flex justify-center">
             <p className="text-xs text-text-muted">AI가 응답 데이터를 분석하고 있습니다. 완료 시 알림을 드립니다.</p>
+          </div>
+        )}
+        {isAnalyzed && (
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
+              <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <p className="text-xs text-amber-800 font-medium">분석이 완료되었습니다. 전문가 검토 후 리포트가 공개됩니다.</p>
+            </div>
+            <Link
+              href={`/client/projects/${id}/results`}
+              className="text-xs text-navy hover:underline"
+            >
+              검토 현황 확인하기 →
+            </Link>
           </div>
         )}
         {isCompleted && (
@@ -644,8 +663,8 @@ export default function ClientProjectDetailPage() {
         </Card>
       )}
 
-      {/* === completed / analyzing 상태: 패널 응답 결과 === */}
-      {(isCompleted || isAnalyzing) && responseReport && responseReport.panels.length > 0 && (
+      {/* === completed / analyzing / analyzed 상태: 패널 응답 결과 === */}
+      {(isCompleted || isAnalyzing || isAnalyzed) && responseReport && responseReport.panels.length > 0 && (
         <Card className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <CardTitle>패널 응답 결과</CardTitle>

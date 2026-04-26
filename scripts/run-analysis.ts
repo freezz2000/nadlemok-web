@@ -331,10 +331,10 @@ async function main() {
   if (aErr) { console.error('❌ 분석 결과 저장 실패', aErr); process.exit(1) }
   console.log('✅ analysis_results 저장 완료')
 
-  // 13. 프로젝트 → completed, 설문 → closed
-  await admin.from('projects').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', projectId)
+  // 13. 프로젝트 → analyzed (관리자 검토 대기), 설문 → closed
+  await admin.from('projects').update({ status: 'analyzed' }).eq('id', projectId)
   await admin.from('surveys').update({ status: 'closed' }).eq('id', survey.id)
-  console.log('✅ 프로젝트 → completed, 설문 → closed')
+  console.log('✅ 프로젝트 → analyzed (관리자 검토 대기), 설문 → closed')
 
   // 14. survey_panels → completed (응답한 패널만)
   await admin.from('survey_panels').update({ status: 'completed' })
