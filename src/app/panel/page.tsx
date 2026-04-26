@@ -22,7 +22,12 @@ export default async function PanelHome() {
     .eq('panel_id', profile.id)
     .order('matched_at', { ascending: false })
 
-  const activeSurveys = matchings?.filter((m) => m.status !== 'dropped' && m.status !== 'completed' && m.survey?.status !== 'closed') || []
+  // survey.status === 'active' 인 것만 진행중으로 표시 (draft는 클라이언트가 아직 설문을 시작하지 않은 상태)
+  const activeSurveys = matchings?.filter((m) =>
+    m.status !== 'dropped' &&
+    m.status !== 'completed' &&
+    m.survey?.status === 'active'
+  ) || []
   const completedSurveys = matchings?.filter((m) => m.status === 'completed') || []
 
   return (

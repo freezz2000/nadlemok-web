@@ -24,6 +24,7 @@ export default function SurveyResponsePage() {
   const [responses, setResponses] = useState<Record<string, number | string>>({})
   const [existingResponseId, setExistingResponseId] = useState<string | null>(null)
   const [isReadOnly, setIsReadOnly] = useState(false)
+  const [isNotStarted, setIsNotStarted] = useState(false)  // 설문 미시작 (draft)
   const [submitting, setSubmitting] = useState(false)
   const [saved, setSaved] = useState(false)
   const startTime = useRef(Date.now())
@@ -39,9 +40,15 @@ export default function SurveyResponsePage() {
       .single()
     setSurvey(surveyData)
 
+    // 설문 미시작 (draft) — 고객사가 아직 "설문 시작하기"를 누르지 않은 상태
+    if (surveyData?.status === 'draft') {
+      setIsNotStarted(true)
+      return
+    }
+
     // 분석 단계 이후는 읽기 전용
     const projectStatus = (surveyData as unknown as { project: { status: string } })?.project?.status
-    if (projectStatus === 'analyzing' || projectStatus === 'completed') {
+    if (surveyData?.status === 'closed' || projectStatus === 'analyzing' || projectStatus === 'completed') {
       setIsReadOnly(true)
     }
 
@@ -142,6 +149,31 @@ export default function SurveyResponsePage() {
   }
 
   if (!survey) return <p className="text-text-muted p-6">로딩중...</p>
+
+  // 설문 미시작 — 고객사가 "설문 시작하기"를 누르기 전
+  if (isNotStarted) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <button onClick={() => router.push('/panel')} className="text-text-muted hover:text-text text-sm mb-6 flex items-center gap-1">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          돌아가기
+        </button>
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-full bg-surface-dark flex items-center justify-center mb-5">
+            <svg className="w-8 h-8 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-text mb-2">설문이 아직 시작되지 않았습니다</h2>
+          <p className="text-sm text-text-muted leading-relaxed max-w-xs">
+            고객사에서 설문을 시작하면 응답하실 수 있습니다.<br />잠시 후 다시 확인해 주세요.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const scaleQuestions = survey.questions.filter((q) => q.type === 'scale')
   const textQuestions = survey.questions.filter((q) => q.type === 'text')
