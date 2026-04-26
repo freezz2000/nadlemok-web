@@ -30,6 +30,11 @@ interface SurveyPanelRow {
   status: string
 }
 
+interface ClientPanelRow {
+  panel_id: string
+  profile: { name: string }[] | null
+}
+
 // ── 메인 컴포넌트 ────────────────────────────────────────
 export default function InvitePage() {
   const { id: projectId } = useParams<{ id: string }>()
@@ -76,6 +81,10 @@ export default function InvitePage() {
   const load = useCallback(async () => {
     setLoading(true)
 
+    // 현재 로그인한 고객사 ID
+    const { data: { user } } = await supabase.auth.getUser()
+    const clientId = user?.id
+
     // 프로젝트명
     const { data: proj } = await supabase
       .from('projects')
@@ -119,37 +128,50 @@ export default function InvitePage() {
       invList.filter((i) => i.panel_id && i.status === 'accepted').map((i) => i.panel_id!)
     )
 
-    // survey_panels 로드 → 응답여부 + 배정목록 + 링크 가입 패널
+    // ── 링크 가입 패널: client_panels에서 로드 (설문 유무 무관하게 항상 존재)
+    // accept-project API는 설문 유무와 관계없이 client_panels에 항상 기록
+    if (clientId) {
+      const { data: cpRows } = await supabase
+        .from('client_panels')
+        .select('panel_id, profile:profiles!panel_id(name)')
+        .eq('client_id', clientId)
+
+      const linkJoined: LinkPanel[] = ((cpRows as ClientPanelRow[]) || [])
+        .filter((cp) => !alimtalkPanelIdSet.has(cp.panel_id))
+        .map((cp) => ({
+          panel_id: cp.panel_id,
+          status: 'matched',
+          profile: cp.profile,
+        }))
+      setLinkPanels(linkJoined)
+    } else {
+      setLinkPanels([])
+    }
+
+    // ── survey_panels: 응답여부 + 배정 현황 추적 전용 (링크 패널 소스로는 사용 안 함)
     if (survey?.id) {
       const { data: surveyPanels } = await supabase
         .from('survey_panels')
-        .select('panel_id, status, profile:profiles!panel_id(name)')
+        .select('panel_id, status')
         .eq('survey_id', survey.id)
 
-      const rows = (surveyPanels as (SurveyPanelRow & { profile: { name: string }[] | null })[]) || []
+      const rows = (surveyPanels as SurveyPanelRow[]) || []
 
       const responseM: Record<string, boolean> = {}
       const assignedIds = new Set<string>()
-      const linkJoined: LinkPanel[] = []
 
       rows.forEach((sp) => {
         responseM[sp.panel_id] = sp.status === 'completed'
         assignedIds.add(sp.panel_id)
-        // 알림톡으로 온 패널이 아닌 경우 → 링크 가입
-        if (!alimtalkPanelIdSet.has(sp.panel_id)) {
-          linkJoined.push({ panel_id: sp.panel_id, status: sp.status, profile: sp.profile ?? null })
-        }
       })
 
       setResponseMap(responseM)
       setAssignedPanelIds(assignedIds)
       setSelectedAssignment(new Set(assignedIds))
-      setLinkPanels(linkJoined)
     } else {
       setResponseMap({})
       setAssignedPanelIds(new Set())
       setSelectedAssignment(new Set())
-      setLinkPanels([])
     }
 
     setLoading(false)
