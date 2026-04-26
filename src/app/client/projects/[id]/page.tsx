@@ -156,65 +156,68 @@ export default function ClientProjectDetailPage() {
   }
 
   async function saveDraft() {
-    if (!project) return
+    if (!project || questions.length === 0) return
     setSaving(true)
-
-    if (existingSurveyId) {
-      await supabase.from('surveys').update({
-        questions,
-        template_id: selectedTemplateId || null,
-      }).eq('id', existingSurveyId)
-    } else if (questions.length > 0) {
-      const { data } = await supabase.from('surveys').insert({
-        project_id: id,
-        template_id: selectedTemplateId || null,
-        title: `${project.product_name} 설문`,
-        questions,
-        day_checkpoint: [1],
-      }).select().single()
-      if (data) setExistingSurveyId(data.id)
+    try {
+      const res = await fetch('/api/surveys/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: id,
+          questions,
+          templateId: selectedTemplateId || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.surveyId) {
+        setExistingSurveyId(data.surveyId)
+      } else {
+        alert(data.error || '설문 저장에 실패했습니다.')
+      }
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
   async function advanceSurvey() {
     if (!project || questions.length === 0) return
     setConfirming(true)
 
-    // 설문 저장
-    if (existingSurveyId) {
-      await supabase.from('surveys').update({
-        questions,
-        template_id: selectedTemplateId || null,
-        status: 'draft',
-      }).eq('id', existingSurveyId)
-    } else {
-      const { data: newSurvey } = await supabase.from('surveys').insert({
-        project_id: id,
-        template_id: selectedTemplateId || null,
-        title: `${project.product_name} 설문`,
-        questions,
-        day_checkpoint: [1],
-        status: 'draft',
-      }).select().single()
-      if (newSurvey) setExistingSurveyId(newSurvey.id)
-    }
+    try {
+      // 1. 설문 저장 (service role API — surveys RLS에 클라이언트 INSERT/UPDATE 정책 없음)
+      const saveRes = await fetch('/api/surveys/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: id,
+          questions,
+          templateId: selectedTemplateId || undefined,
+          status: 'draft',
+        }),
+      })
+      const saveData = await saveRes.json()
+      if (!saveRes.ok) {
+        alert(saveData.error || '설문 저장에 실패했습니다.')
+        return
+      }
+      if (saveData.surveyId) setExistingSurveyId(saveData.surveyId)
 
-    // 프로젝트 상태 전진 (내부: testing / 외부: matching)
-    const res = await fetch('/api/projects/advance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId: id }),
-    })
-    const data = await res.json()
-    if (res.ok) {
-      // 상태 갱신
-      const { data: updated } = await supabase.from('projects').select('*').eq('id', id).single()
-      if (updated) setProject(updated)
-    } else {
-      alert(data.error || '오류가 발생했습니다. 다시 시도해주세요.')
+      // 2. 프로젝트 상태 전진 (내부: testing / 외부: matching)
+      const advRes = await fetch('/api/projects/advance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: id }),
+      })
+      const advData = await advRes.json()
+      if (advRes.ok) {
+        const { data: updated } = await supabase.from('projects').select('*').eq('id', id).single()
+        if (updated) setProject(updated)
+      } else {
+        alert(advData.error || '오류가 발생했습니다. 다시 시도해주세요.')
+      }
+    } finally {
+      setConfirming(false)
     }
-    setConfirming(false)
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
