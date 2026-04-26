@@ -114,13 +114,40 @@ export default function InvitePage() {
     setSurveyId(survey?.id ?? null)
     setSurveyStatus(survey?.status ?? null)
 
-    // 알림톡 초대 목록
+    // ── 공통 헬퍼: 패널 이름 API 조회 (profiles RLS 우회용) ──────────────
+    async function fetchPanelNames(ids: string[]): Promise<Record<string, string>> {
+      if (ids.length === 0) return {}
+      try {
+        const res = await fetch(`/api/invite/panel-names?ids=${ids.join(',')}`)
+        if (!res.ok) return {}
+        const { names } = await res.json() as { names: Record<string, string> }
+        return names
+      } catch {
+        return {}
+      }
+    }
+
+    // 알림톡 초대 목록 (이름은 별도 API로 조회 — profiles RLS 우회)
     const { data: invs } = await supabase
       .from('project_invitations')
-      .select('id, phone, status, invited_at, accepted_at, expires_at, panel_id, panel_profile:profiles!panel_id(name)')
+      .select('id, phone, status, invited_at, accepted_at, expires_at, panel_id')
       .eq('project_id', projectId)
       .order('invited_at', { ascending: false })
-    const invList = (invs as AlimtalkInvitation[]) || []
+    const rawInvList = (invs as Omit<AlimtalkInvitation, 'panel_profile'>[]) || []
+
+    // 수락 완료된 패널 이름 일괄 조회
+    const acceptedPanelIds = rawInvList
+      .filter((i) => i.panel_id && i.status === 'accepted')
+      .map((i) => i.panel_id!)
+    const alimtalkNameMap = await fetchPanelNames(acceptedPanelIds)
+
+    const invList: AlimtalkInvitation[] = rawInvList.map((inv) => ({
+      ...inv,
+      panel_profile:
+        inv.panel_id && alimtalkNameMap[inv.panel_id]
+          ? [{ name: alimtalkNameMap[inv.panel_id] }]
+          : null,
+    }))
     setAlimtalkInvitations(invList)
 
     // 알림톡으로 가입 완료된 패널 ID 목록
@@ -140,18 +167,8 @@ export default function InvitePage() {
         .map((cp) => cp.panel_id)
         .filter((pid) => !alimtalkPanelIdSet.has(pid))
 
-      // 이름은 profiles 테이블에서 별도 조회 (FK join 없이)
-      let profileMap: Record<string, string> = {}
-      if (linkPanelIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('id, name')
-          .in('id', linkPanelIds)
-        profileMap = Object.fromEntries(
-          ((profileRows as { id: string; name: string | null }[]) || [])
-            .map((p) => [p.id, p.name || ''])
-        )
-      }
+      // 이름은 API로 조회 (profiles RLS 우회)
+      const profileMap = await fetchPanelNames(linkPanelIds)
 
       const linkJoined: LinkPanel[] = linkPanelIds.map((pid) => ({
         panel_id: pid,
