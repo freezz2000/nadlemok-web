@@ -99,7 +99,7 @@ export default function HeroSection() {
 
         {/* Main content grid */}
         <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="grid items-center">
 
             {/* ── Left column: text + CTA ── */}
             <div>
@@ -116,7 +116,7 @@ export default function HeroSection() {
                 {t.hero.headline}
               </h1>
 
-              <p className="text-lg text-white/70 leading-relaxed mb-10 max-w-xl whitespace-pre-line">
+              <p className="text-lg text-white/70 leading-relaxed mb-10 max-w-2xl whitespace-pre-line">
                 {t.hero.description}
               </p>
 
@@ -146,8 +146,8 @@ export default function HeroSection() {
               </div>
             </div>
 
-            {/* ── Right column: phone mockup with frame canvas ── */}
-            <div className="hidden lg:flex justify-center items-center">
+            {/* ── Right column: phone mockup with frame canvas (hidden) ── */}
+            <div className="hidden justify-center items-center">
               <div className="relative">
                 {/* Ambient glow behind phone */}
                 <div className="absolute -inset-10 bg-gold/8 blur-3xl rounded-full pointer-events-none" />
