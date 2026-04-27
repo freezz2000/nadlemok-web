@@ -158,7 +158,12 @@ function LoginContent() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">비밀번호</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-text">비밀번호</label>
+                  <Link href="/forgot-password" className="text-xs text-text-muted hover:text-navy transition-colors">
+                    비밀번호를 잊으셨나요?
+                  </Link>
+                </div>
                 <input
                   type="password"
                   value={password}
