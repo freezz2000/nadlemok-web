@@ -93,6 +93,15 @@ export default function PanelProfilePage() {
   const [selectedConcerns, setSelectedConcerns] = useState<string[]>([])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+
+  // 휴대폰 OTP 인증
+  const [phoneVerified, setPhoneVerified] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [otpLoading, setOtpLoading] = useState(false)
+  const [otpVerifyLoading, setOtpVerifyLoading] = useState(false)
+  const [otpError, setOtpError] = useState('')
+  const [otpCountdown, setOtpCountdown] = useState(0)
   const [form, setForm] = useState({
     gender: '',
     age_group: '',
@@ -104,6 +113,59 @@ export default function PanelProfilePage() {
   const [terms, setTerms] = useState(initialTerms)
   const [expandedTerm, setExpandedTerm] = useState<string | null>(null)
 
+  // OTP 카운트다운
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (otpCountdown <= 0) return
+    const timer = setTimeout(() => setOtpCountdown(c => c - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [otpCountdown])
+
+  const handleSendOtp = async () => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    if (!/^01[0-9]{8,9}$/.test(cleanPhone)) {
+      setFieldErrors(p => ({ ...p, phone: '올바른 휴대폰 번호를 입력해주세요. (예: 01012345678)' }))
+      return
+    }
+    setOtpLoading(true)
+    setOtpError('')
+    const res = await fetch('/api/auth/send-phone-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: cleanPhone }),
+    })
+    setOtpLoading(false)
+    if (!res.ok) {
+      const data = await res.json()
+      setOtpError(data.error || '인증번호 발송에 실패했습니다.')
+      return
+    }
+    setOtpSent(true)
+    setOtp('')
+    setOtpCountdown(300)
+    setFieldErrors(p => ({ ...p, phone: '' }))
+  }
+
+  const handleVerifyOtp = async () => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    setOtpVerifyLoading(true)
+    setOtpError('')
+    const res = await fetch('/api/auth/verify-phone-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: cleanPhone, otp }),
+    })
+    setOtpVerifyLoading(false)
+    if (!res.ok) {
+      const data = await res.json()
+      setOtpError(data.error || '인증에 실패했습니다.')
+      return
+    }
+    setPhoneVerified(true)
+    setOtpSent(false)
+    setFieldErrors(p => ({ ...p, phone: '' }))
+  }
+
   const allRequired = REQUIRED_TERMS.every(({ key }) => terms[key as keyof typeof terms])
   const allChecked = allRequired && terms.marketing
 
@@ -111,6 +173,7 @@ export default function PanelProfilePage() {
     const errors: Record<string, string> = {}
     if (!name.trim()) errors.name = '이름을 입력해주세요.'
     if (!phone.trim()) errors.phone = '연락처를 입력해주세요.'
+    else if (!phoneVerified) errors.phone = '휴대폰 인증을 완료해주세요.'
     if (!address.zipcode || !address.address) errors.address = '주소 검색으로 주소를 입력해주세요.'
     if (!form.gender) errors.gender = '성별을 선택해주세요.'
     if (!form.age_group) errors.age_group = '연령대를 선택해주세요.'
@@ -179,7 +242,7 @@ export default function PanelProfilePage() {
       if (name || phone) {
         await supabase.from('profiles').update({
           ...(name ? { name } : {}),
-          ...(phone ? { phone } : {}),
+          ...(phone ? { phone, phone_verified: true } : {}),
         }).eq('id', user.id)
       }
 
@@ -275,18 +338,83 @@ export default function PanelProfilePage() {
               {fieldErrors.name && <p className="text-xs text-nogo mt-1">{fieldErrors.name}</p>}
             </div>
 
-            {/* 연락처 */}
+            {/* 연락처 + OTP 인증 */}
             <div>
               <label className="block text-sm font-medium text-text mb-1.5">
                 연락처 <span className="text-nogo">*</span>
               </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => { setPhone(e.target.value); setFieldErrors(p => ({ ...p, phone: '' })) }}
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${fieldErrors.phone ? 'border-nogo' : 'border-border'}`}
-                placeholder="010-0000-0000"
-              />
+
+              {phoneVerified ? (
+                /* 인증 완료 상태 */
+                <div className="flex items-center gap-2 px-3 py-2 border border-go rounded-lg bg-go/5">
+                  <svg className="w-4 h-4 text-go flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-go font-medium">{phone} 인증 완료</span>
+                </div>
+              ) : (
+                <>
+                  {/* 전화번호 입력 + 인증번호 받기 */}
+                  <div className="flex gap-2">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value)
+                        setFieldErrors(p => ({ ...p, phone: '' }))
+                        if (otpSent) { setOtpSent(false); setOtp(''); setOtpError(''); setOtpCountdown(0) }
+                      }}
+                      disabled={otpSent}
+                      className={`flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${fieldErrors.phone ? 'border-nogo' : 'border-border'} ${otpSent ? 'bg-surface text-text-muted' : ''}`}
+                      placeholder="01012345678"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={otpLoading}
+                      className="px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90 transition-colors whitespace-nowrap disabled:opacity-60"
+                    >
+                      {otpLoading ? '발송 중...' : otpSent ? '재발송' : '인증번호 받기'}
+                    </button>
+                  </div>
+
+                  {/* OTP 입력창 */}
+                  {otpSent && (
+                    <div className="mt-2">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={otp}
+                            onChange={(e) => { setOtp(e.target.value.replace(/[^0-9]/g, '')); setOtpError('') }}
+                            maxLength={6}
+                            className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy ${otpError ? 'border-nogo' : 'border-border'}`}
+                            placeholder="인증번호 6자리"
+                          />
+                          {otpCountdown > 0 && (
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-muted tabular-nums">
+                              {Math.floor(otpCountdown / 60)}:{String(otpCountdown % 60).padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleVerifyOtp}
+                          disabled={otpVerifyLoading || otp.length !== 6}
+                          className="px-3 py-2 bg-navy text-white text-sm rounded-lg hover:bg-navy/90 transition-colors whitespace-nowrap disabled:opacity-60"
+                        >
+                          {otpVerifyLoading ? '확인 중...' : '확인'}
+                        </button>
+                      </div>
+                      {otpError && <p className="text-xs text-nogo mt-1">{otpError}</p>}
+                      {otpCountdown === 0 && !otpError && (
+                        <p className="text-xs text-text-muted mt-1">인증번호가 만료되었습니다. 재발송 버튼을 눌러주세요.</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
               {fieldErrors.phone && <p className="text-xs text-nogo mt-1">{fieldErrors.phone}</p>}
             </div>
 
