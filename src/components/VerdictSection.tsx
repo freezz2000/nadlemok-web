@@ -17,7 +17,7 @@ export default function VerdictSection() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {t.verdict.items.map((item, i) => (
-            <div key={i} className={`rounded-xl p-8 border ${styles[i].bg} ${styles[i].border}`}>
+            <div key={i} className={`rounded-xl p-8 border hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${styles[i].bg} ${styles[i].border}`}>
               <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold mb-4 ${styles[i].badge}`}>
                 {item.label}
               </span>

@@ -29,7 +29,7 @@ export default function SolutionSection() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {t.solution.features.map((f, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 border border-border hover:border-gold/40 transition-colors group">
+            <div key={i} className="bg-white rounded-xl p-6 border border-border hover:border-gold/40 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
               <div className="w-12 h-12 rounded-lg bg-navy/5 flex items-center justify-center text-navy mb-4 group-hover:bg-gold/10 group-hover:text-gold transition-colors">
                 {icons[i]}
               </div>

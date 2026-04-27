@@ -50,12 +50,12 @@ export default function ProcessSection() {
   const { internal, external } = t.process;
 
   return (
-    <section id="process" className="py-24 bg-white">
+    <section id="process" className="py-24 bg-gradient-to-b from-white to-[#eef2f9]">
       <div className="max-w-7xl mx-auto px-6">
 
         {/* 헤더 */}
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-navy mb-3">{t.process.title}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-3 bg-gradient-to-br from-navy to-gold bg-clip-text text-transparent">{t.process.title}</h2>
           <p className="text-text-muted max-w-2xl mx-auto">{t.process.subtitle}</p>
         </div>
 
@@ -63,7 +63,7 @@ export default function ProcessSection() {
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-10">
 
           {/* 내부 패널 트랙 */}
-          <div className="rounded-xl border border-go/30 bg-go-bg/40 p-6">
+          <div className="rounded-xl border border-go/30 bg-go-bg/40 p-6 hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <span className="text-xs font-semibold text-go uppercase tracking-widest">{internal.badge}</span>
@@ -78,7 +78,7 @@ export default function ProcessSection() {
           </div>
 
           {/* 외부 패널 트랙 */}
-          <div className="rounded-xl border border-navy/20 bg-navy/[0.03] p-6">
+          <div className="rounded-xl border border-navy/20 bg-navy/[0.03] p-6 hover:shadow-md transition-all duration-200">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <span className="text-xs font-semibold text-navy uppercase tracking-widest">{external.badge}</span>

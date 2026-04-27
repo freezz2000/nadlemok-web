@@ -10,14 +10,14 @@ export default function PricingSection() {
   return (
     <section id="pricing" className="py-24 bg-surface">
       <div className="max-w-7xl mx-auto px-6">
-        <h2 className="text-3xl md:text-4xl font-bold text-navy text-center mb-16">
+        <h2 className="text-3xl md:text-4xl font-bold text-center mb-16 bg-gradient-to-br from-navy to-gold bg-clip-text text-transparent">
           {t.pricing.title}
         </h2>
 
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-6">
 
           {/* ── Basic 카드 ── */}
-          <div className="rounded-xl border border-border bg-white p-8 flex flex-col">
+          <div className="rounded-xl border border-border bg-white p-8 flex flex-col hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
             <div className="mb-6">
               <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1">내부 패널</p>
               <h3 className="text-xl font-bold text-navy">{basic.name}</h3>
@@ -48,7 +48,7 @@ export default function PricingSection() {
           </div>
 
           {/* ── 외부 패널 크레딧 카드 ── */}
-          <div className="rounded-xl border-2 border-navy bg-navy p-8 flex flex-col">
+          <div className="rounded-xl border-2 border-navy bg-navy p-8 flex flex-col shadow-xl shadow-navy/25 ring-1 ring-navy-light/30">
             <div className="mb-6">
               <p className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-1">외부 패널</p>
               <h3 className="text-xl font-bold text-white">{credits.title}</h3>
@@ -65,7 +65,7 @@ export default function PricingSection() {
                   key={i}
                   className={`rounded-xl p-4 border transition-all ${
                     pkg.recommended
-                      ? "bg-gold/20 border-gold/50"
+                      ? "bg-gold/25 border-gold shadow-md shadow-gold/20"
                       : "bg-white/10 border-white/20"
                   }`}
                 >

@@ -56,3 +56,9 @@
   opacity: 1;
   transform: translateY(0);
 }
+
+/* 도트 그리드 패턴 — white 섹션 텍스처 */
+.bg-dot-pattern {
+  background-image: radial-gradient(circle, rgba(27,42,74,0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
