@@ -16,9 +16,11 @@ async function sendAligoSms(phone: string, message: string) {
     return { ok: false, message: '알리고 환경변수 미설정' }
   }
 
+  // Aligo SMS API는 Alimtalk과 파라미터 이름이 다름
+  // Alimtalk: apikey, userid  /  SMS: key, user_id
   const params = new URLSearchParams({
-    apikey,
-    userid,
+    key: apikey,
+    user_id: userid,
     sender,
     receiver: phone,
     msg: message,
@@ -38,6 +40,7 @@ async function sendAligoSms(phone: string, message: string) {
     } catch {
       return { ok: false, message: `응답 파싱 실패: ${text.slice(0, 100)}` }
     }
+    console.log('[send-phone-otp] Aligo SMS 응답:', JSON.stringify(data))
     // result_code: "1" 또는 1 이면 성공
     if (data.result_code === '1' || data.result_code === 1) return { ok: true }
     return { ok: false, message: `[Aligo ${data.result_code}] ${data.message}` }
