@@ -366,6 +366,8 @@ export default function ClientProfilePage() {
                 </>
               )}
 
+              {/* 발송 실패 에러 (otpSent=false 상태일 때 표시) */}
+              {otpError && !otpSent && <p className="text-xs text-nogo mt-1">{otpError}</p>}
               {fieldErrors.contactPhone && <p className="text-xs text-nogo mt-1">{fieldErrors.contactPhone}</p>}
             </div>
 
