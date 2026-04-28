@@ -33,19 +33,20 @@ async function sendCoolSms(phone: string, message: string) {
   }
 
   try {
-    const res = await fetch('https://api.coolsms.co.kr/messages/v4/send-simple', {
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: makeCoolSmsAuthHeader(apiKey, apiSecret),
       },
       body: JSON.stringify({
-        message: {
-          to: phone,
-          from: sender,
-          text: message,
-          type: 'SMS',
-        },
+        messages: [
+          {
+            to: phone,
+            from: sender,
+            text: message,
+          },
+        ],
       }),
     })
 

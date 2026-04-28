@@ -45,14 +45,15 @@ export async function GET() {
   let sendStatus = 0
   try {
     const body = JSON.stringify({
-      message: {
-        to: sender,
-        from: sender,
-        text: '[나들목] SMS 테스트 메시지입니다.',
-        type: 'SMS',
-      },
+      messages: [
+        {
+          to: sender,
+          from: sender,
+          text: '[나들목] SMS 테스트 메시지입니다.',
+        },
+      ],
     })
-    const sendRes = await fetch('https://api.coolsms.co.kr/messages/v4/send-simple', {
+    const sendRes = await fetch('https://api.solapi.com/messages/v4/send', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
