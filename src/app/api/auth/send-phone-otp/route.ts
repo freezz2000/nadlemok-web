@@ -40,13 +40,11 @@ async function sendCoolSms(phone: string, message: string) {
         Authorization: makeCoolSmsAuthHeader(apiKey, apiSecret),
       },
       body: JSON.stringify({
-        messages: [
-          {
-            to: phone,
-            from: sender,
-            text: message,
-          },
-        ],
+        message: {
+          to: phone,
+          from: sender,
+          text: message,
+        },
       }),
     })
 
