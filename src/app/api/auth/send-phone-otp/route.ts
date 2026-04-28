@@ -9,10 +9,14 @@ const supabase = createClient(
 async function sendAligoSms(phone: string, message: string) {
   const apikey = process.env.ALIGO_API_KEY
   const userid = process.env.ALIGO_USER_ID
-  const sender = process.env.ALIGO_SENDER_PHONE
+  const sender = process.env.ALIGO_SENDER_PHONE ?? process.env.ALIGO_SENDER
 
   if (!apikey || !userid || !sender) {
-    console.error('[send-phone-otp] 알리고 환경변수 미설정')
+    console.error('[send-phone-otp] 알리고 환경변수 미설정:', {
+      ALIGO_API_KEY: !!apikey,
+      ALIGO_USER_ID: !!userid,
+      ALIGO_SENDER: !!sender,
+    })
     return { ok: false, message: '알리고 환경변수 미설정' }
   }
 
