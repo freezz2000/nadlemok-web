@@ -1,58 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-async function sendAligoSms(phone: string, message: string) {
-  const apikey = process.env.ALIGO_API_KEY
-  const userid = process.env.ALIGO_USER_ID
-  const sender = process.env.ALIGO_SENDER_PHONE ?? process.env.ALIGO_SENDER
+// ── CoolSMS(솔라피) SMS 발송 ──────────────────────────────────────────────────
+function makeCoolSmsAuthHeader(apiKey: string, apiSecret: string): string {
+  const date = new Date().toISOString()
+  const salt = crypto.randomBytes(8).toString('hex')
+  const signature = crypto
+    .createHmac('sha256', apiSecret)
+    .update(date + salt)
+    .digest('hex')
+  return `HMAC-SHA256 ApiKey=${apiKey}, Date=${date}, Salt=${salt}, Signature=${signature}`
+}
 
-  if (!apikey || !userid || !sender) {
-    console.error('[send-phone-otp] 알리고 환경변수 미설정:', {
-      ALIGO_API_KEY: !!apikey,
-      ALIGO_USER_ID: !!userid,
-      ALIGO_SENDER: !!sender,
+async function sendCoolSms(phone: string, message: string) {
+  const apiKey = process.env.COOLSMS_API_KEY
+  const apiSecret = process.env.COOLSMS_API_SECRET
+  const sender = process.env.COOLSMS_SENDER_PHONE
+
+  if (!apiKey || !apiSecret || !sender) {
+    console.error('[send-phone-otp] CoolSMS 환경변수 미설정:', {
+      COOLSMS_API_KEY: !!apiKey,
+      COOLSMS_API_SECRET: !!apiSecret,
+      COOLSMS_SENDER_PHONE: !!sender,
     })
-    return { ok: false, message: '알리고 환경변수 미설정' }
+    return { ok: false, message: 'CoolSMS 환경변수 미설정' }
   }
 
-  // Aligo SMS API는 Alimtalk과 파라미터 이름이 다름
-  // Alimtalk: apikey, userid  /  SMS: key, user_id
-  const params = new URLSearchParams({
-    key: apikey,
-    user_id: userid,
-    sender,
-    receiver: phone,
-    msg: message,
-    msg_type: 'SMS',
-  })
-
   try {
-    const res = await fetch('https://apis.aligo.in/send/', {
+    const res = await fetch('https://api.coolsms.co.kr/messages/v4/send-simple', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: makeCoolSmsAuthHeader(apiKey, apiSecret),
+      },
+      body: JSON.stringify({
+        message: {
+          to: phone,
+          from: sender,
+          text: message,
+          type: 'SMS',
+        },
+      }),
     })
+
     const text = await res.text()
     let data: Record<string, unknown>
     try {
       data = JSON.parse(text)
     } catch {
-      return { ok: false, message: `응답 파싱 실패: ${text.slice(0, 100)}` }
+      return { ok: false, message: `응답 파싱 실패: ${text.slice(0, 200)}` }
     }
-    console.log('[send-phone-otp] Aligo SMS 응답:', JSON.stringify(data))
-    // result_code: "1" 또는 1 이면 성공
-    if (data.result_code === '1' || data.result_code === 1) return { ok: true }
-    return { ok: false, message: `[Aligo ${data.result_code}] ${data.message}` }
+
+    console.log('[send-phone-otp] CoolSMS 응답:', JSON.stringify(data))
+
+    if (res.ok) return { ok: true }
+    return { ok: false, message: `[CoolSMS] ${JSON.stringify(data)}` }
   } catch (e) {
     return { ok: false, message: String(e) }
   }
 }
 
+// ── POST /api/auth/send-phone-otp ─────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const { phone } = await req.json()
@@ -81,8 +95,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '인증번호 생성에 실패했습니다.' }, { status: 500 })
     }
 
-    // Aligo SMS 발송
-    const smsResult = await sendAligoSms(cleanPhone, `[나들목] 인증번호: ${otp} (5분 이내 입력)`)
+    // CoolSMS 발송
+    const smsResult = await sendCoolSms(cleanPhone, `[나들목] 인증번호: ${otp} (5분 이내 입력)`)
 
     if (!smsResult.ok) {
       console.error('[send-phone-otp] SMS 발송 실패:', smsResult.message)
