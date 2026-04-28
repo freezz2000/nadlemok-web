@@ -2,47 +2,58 @@ import { NextResponse } from 'next/server'
 
 // 임시 진단 엔드포인트 — 사용 후 삭제 예정
 export async function GET() {
-  // Vercel이 자동 주입하는 프로젝트/배포 메타정보
-  const vercelMeta = {
-    VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? '미설정',
-    VERCEL_URL: process.env.VERCEL_URL ?? '미설정',
-    VERCEL_ENV: process.env.VERCEL_ENV ?? '미설정',
-    VERCEL_REGION: process.env.VERCEL_REGION ?? '미설정',
-    NODE_ENV: process.env.NODE_ENV ?? '미설정',
-  }
-
-  // process.env에서 ALIGO 관련 키 전부 수집
-  const aligoKeys = Object.keys(process.env)
-    .filter((k) => k.toUpperCase().includes('ALIGO'))
-    .reduce<Record<string, string>>((acc, k) => {
-      const v = process.env[k] ?? ''
-      acc[k] = v ? `설정됨 (앞5자: ${v.slice(0, 5)}..., 길이: ${v.length})` : '❌ 빈값'
-      return acc
-    }, {})
-
-  // 전체 env 키 수 (디버깅용)
-  const totalEnvKeys = Object.keys(process.env).length
-
   const apikey = process.env.ALIGO_API_KEY
   const userid = process.env.ALIGO_USER_ID
   const sender = process.env.ALIGO_SENDER_PHONE ?? process.env.ALIGO_SENDER
 
-  const envStatus = {
-    ALIGO_API_KEY: apikey ? `설정됨 (앞5자: ${apikey.slice(0, 5)}..., 길이: ${apikey.length})` : '❌ 미설정',
-    ALIGO_USER_ID: userid ? `설정됨 (값: ${userid})` : '❌ 미설정',
-    ALIGO_SENDER_PHONE: process.env.ALIGO_SENDER_PHONE
-      ? `설정됨 (값: ${process.env.ALIGO_SENDER_PHONE})`
-      : '❌ 미설정',
-    ALIGO_SENDER: process.env.ALIGO_SENDER ?? '미설정',
-    sender_used: sender ?? '❌ undefined',
+  if (!apikey || !userid || !sender) {
+    return NextResponse.json({ ok: false, step: 'env_missing', apikey: !!apikey, userid: !!userid, sender: !!sender })
+  }
+
+  // 1. 잔액 조회 (SMS 차감 없음)
+  let remainData: unknown = null
+  try {
+    const remainParams = new URLSearchParams({ key: apikey, user_id: userid })
+    const remainRes = await fetch('https://apis.aligo.in/remain/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: remainParams.toString(),
+    })
+    const remainText = await remainRes.text()
+    try { remainData = JSON.parse(remainText) } catch { remainData = remainText }
+  } catch (e) {
+    return NextResponse.json({ ok: false, step: 'remain_error', error: String(e) })
+  }
+
+  // 2. 실제 SMS 발송 테스트 (발신번호로 자기 자신에게)
+  let sendData: unknown = null
+  try {
+    const sendParams = new URLSearchParams({
+      key: apikey,
+      user_id: userid,
+      sender,
+      receiver: sender, // 발신번호로 자기 자신에게 테스트 발송
+      msg: '[나들목] SMS 테스트 메시지입니다.',
+      msg_type: 'SMS',
+    })
+    const sendRes = await fetch('https://apis.aligo.in/send/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: sendParams.toString(),
+    })
+    const sendText = await sendRes.text()
+    try { sendData = JSON.parse(sendText) } catch { sendData = sendText }
+  } catch (e) {
+    sendData = { fetch_error: String(e) }
   }
 
   return NextResponse.json({
-    ok: !!(apikey && userid && sender),
-    envStatus,
-    allAligoKeys: aligoKeys,
-    totalEnvKeys,
-    vercelMeta,
-    timestamp: new Date().toISOString(),
+    ok: true,
+    apikey_prefix: apikey.slice(0, 8),
+    apikey_length: apikey.length,
+    userid,
+    sender,
+    remainResult: remainData,
+    sendResult: sendData,
   })
 }
