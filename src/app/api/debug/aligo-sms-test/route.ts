@@ -1,59 +1,78 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
-// 임시 진단 엔드포인트 — 사용 후 삭제 예정
+function makeCoolSmsAuthHeader(apiKey: string, apiSecret: string): string {
+  const date = new Date().toISOString()
+  const salt = crypto.randomBytes(8).toString('hex')
+  const signature = crypto
+    .createHmac('sha256', apiSecret)
+    .update(date + salt)
+    .digest('hex')
+  return `HMAC-SHA256 ApiKey=${apiKey}, Date=${date}, Salt=${salt}, Signature=${signature}`
+}
+
 export async function GET() {
-  const apikey = process.env.ALIGO_API_KEY
-  const userid = process.env.ALIGO_USER_ID
-  const sender = process.env.ALIGO_SENDER_PHONE ?? process.env.ALIGO_SENDER
+  const apiKey = process.env.COOLSMS_API_KEY
+  const apiSecret = process.env.COOLSMS_API_SECRET
+  const sender = process.env.COOLSMS_SENDER_PHONE
 
-  if (!apikey || !userid || !sender) {
-    return NextResponse.json({ ok: false, step: 'env_missing', apikey: !!apikey, userid: !!userid, sender: !!sender })
+  // 환경변수 확인
+  const envCheck = {
+    COOLSMS_API_KEY: apiKey ? `설정됨 (앞4자: ${apiKey.slice(0, 4)}..., 길이: ${apiKey.length})` : '❌ 미설정',
+    COOLSMS_API_SECRET: apiSecret ? `설정됨 (길이: ${apiSecret.length})` : '❌ 미설정',
+    COOLSMS_SENDER_PHONE: sender ?? '❌ 미설정',
   }
 
-  // 1. 잔액 조회 (SMS 차감 없음)
-  let remainData: unknown = null
+  if (!apiKey || !apiSecret || !sender) {
+    return NextResponse.json({ ok: false, step: 'env_missing', envCheck })
+  }
+
+  // CoolSMS 잔액 조회
+  let balanceResult: unknown = null
   try {
-    const remainParams = new URLSearchParams({ key: apikey, user_id: userid })
-    const remainRes = await fetch('https://apis.aligo.in/remain/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: remainParams.toString(),
+    const balRes = await fetch('https://api.coolsms.co.kr/cash/v1/balance', {
+      method: 'GET',
+      headers: { Authorization: makeCoolSmsAuthHeader(apiKey, apiSecret) },
     })
-    const remainText = await remainRes.text()
-    try { remainData = JSON.parse(remainText) } catch { remainData = remainText }
+    const balText = await balRes.text()
+    try { balanceResult = JSON.parse(balText) } catch { balanceResult = balText }
   } catch (e) {
-    return NextResponse.json({ ok: false, step: 'remain_error', error: String(e) })
+    balanceResult = { error: String(e) }
   }
 
-  // 2. 실제 SMS 발송 테스트 (발신번호로 자기 자신에게)
-  let sendData: unknown = null
+  // CoolSMS 실제 발송 테스트 (발신번호 자기 자신에게)
+  let sendResult: unknown = null
+  let sendStatus = 0
   try {
-    const sendParams = new URLSearchParams({
-      key: apikey,
-      user_id: userid,
-      sender,
-      receiver: sender, // 발신번호로 자기 자신에게 테스트 발송
-      msg: '[나들목] SMS 테스트 메시지입니다.',
-      msg_type: 'SMS',
+    const body = JSON.stringify({
+      message: {
+        to: sender,
+        from: sender,
+        text: '[나들목] SMS 테스트 메시지입니다.',
+        type: 'SMS',
+      },
     })
-    const sendRes = await fetch('https://apis.aligo.in/send/', {
+    const sendRes = await fetch('https://api.coolsms.co.kr/messages/v4/send-simple', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: sendParams.toString(),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: makeCoolSmsAuthHeader(apiKey, apiSecret),
+      },
+      body,
     })
+    sendStatus = sendRes.status
     const sendText = await sendRes.text()
-    try { sendData = JSON.parse(sendText) } catch { sendData = sendText }
+    try { sendResult = JSON.parse(sendText) } catch { sendResult = sendText }
   } catch (e) {
-    sendData = { fetch_error: String(e) }
+    sendResult = { error: String(e) }
   }
 
   return NextResponse.json({
     ok: true,
-    apikey_prefix: apikey.slice(0, 8),
-    apikey_length: apikey.length,
-    userid,
-    sender,
-    remainResult: remainData,
-    sendResult: sendData,
+    envCheck,
+    balanceResult,
+    sendStatus,
+    sendResult,
+    timestamp: new Date().toISOString(),
   })
 }
