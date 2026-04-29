@@ -41,7 +41,7 @@ export default function PricingSection() {
             <p className="text-xs text-text-muted mb-4">{basic.target}</p>
             <Link
               href="/register"
-              className="block text-center py-3 rounded-lg text-sm font-medium bg-navy/5 text-navy hover:bg-navy/10 transition-colors"
+              className="block text-center py-3 rounded-full text-sm font-medium bg-navy/5 text-navy hover:bg-navy/10 transition-colors"
             >
               {basic.cta}
             </Link>
@@ -98,7 +98,7 @@ export default function PricingSection() {
 
             <Link
               href="/register"
-              className="block text-center py-3 rounded-lg text-sm font-medium bg-gold text-navy hover:bg-yellow-300 transition-colors font-semibold"
+              className="block text-center py-3 rounded-full text-sm font-medium bg-gold text-navy hover:bg-yellow-300 transition-colors font-semibold"
             >
               시작하기
             </Link>

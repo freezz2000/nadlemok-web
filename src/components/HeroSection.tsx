@@ -1,211 +1,137 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/i18n/useTranslation";
 
-const FRAME_COUNT = 80;
-// Total extra pixels to scroll for the full 80-frame animation (40 px / frame)
-const SCROLL_RANGE = 3200;
+const KS_ITEMS: Array<{ l: string; p: number; lv: "safe" | "danger" | "warning" }> = [
+  { l: "자극감", p: 4, lv: "safe" },
+  { l: "끈적임", p: 18, lv: "danger" },
+  { l: "원료취", p: 7, lv: "warning" },
+];
+
+const METRICS = [
+  { l: "전반 만족도", v: "3.41" },
+  { l: "구매 의향", v: "3.12" },
+  { l: "추천 의향", v: "3.28" },
+];
 
 export default function HeroSection() {
   const { t } = useTranslation();
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const framesRef = useRef<HTMLImageElement[]>([]);
-  const [framesLoaded, setFramesLoaded] = useState(false);
-  const renderedFrameRef = useRef(-1);
-
-  // ── Draw a single frame onto the canvas ──────────────────────────────
-  const drawFrame = useCallback((index: number) => {
-    const canvas = canvasRef.current;
-    const img = framesRef.current[index];
-    if (!canvas || !img?.complete) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    renderedFrameRef.current = index;
-  }, []);
-
-  // ── Preload all 80 WebP frames ────────────────────────────────────────
-  useEffect(() => {
-    const frames: HTMLImageElement[] = new Array(FRAME_COUNT);
-    let loaded = 0;
-
-    const onDone = () => {
-      loaded++;
-      if (loaded === FRAME_COUNT) {
-        framesRef.current = frames;
-        drawFrame(0); // show first frame immediately
-        setFramesLoaded(true);
-      }
-    };
-
-    for (let i = 0; i < FRAME_COUNT; i++) {
-      const img = new Image();
-      img.onload = onDone;
-      img.onerror = onDone; // don't stall if a file is missing
-      img.src = `/hero-frames/frame-${String(i).padStart(3, "0")}.webp`;
-      frames[i] = img;
-    }
-  }, [drawFrame]);
-
-  // ── Map scroll position → frame index ────────────────────────────────
-  useEffect(() => {
-    if (!framesLoaded) return;
-
-    const handleScroll = () => {
-      const section = sectionRef.current;
-      if (!section) return;
-
-      // Pixels of the section that have scrolled above viewport top
-      const scrolled = -section.getBoundingClientRect().top;
-      // Total scrollable distance = section height − viewport height
-      const scrollable = section.offsetHeight - window.innerHeight;
-      if (scrollable <= 0) return;
-
-      const progress = Math.max(0, Math.min(1, scrolled / scrollable));
-      const targetFrame = Math.min(
-        FRAME_COUNT - 1,
-        Math.floor(progress * FRAME_COUNT)
-      );
-
-      if (targetFrame !== renderedFrameRef.current) {
-        drawFrame(targetFrame);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // sync on first render / soft-nav
-
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [framesLoaded, drawFrame]);
 
   return (
-    // ── Tall scroll container: viewport + 3200 px extra scroll room ─────
-    <div
-      ref={sectionRef}
-      style={{ height: `calc(100vh + ${SCROLL_RANGE}px)` }}
-      className="relative"
-    >
-      {/* Sticky full-viewport panel that stays fixed during scroll */}
-      <div className="sticky top-0 h-screen flex items-center bg-navy overflow-hidden">
+    <section className="relative bg-navy overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-navy via-navy-light to-navy-dark opacity-90" />
+      <div className="absolute top-20 right-20 w-96 h-96 rounded-full bg-gold/5 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-20 left-10 w-72 h-72 rounded-full bg-gold/5 blur-3xl pointer-events-none" />
+      <div className="absolute top-1/2 right-1/3 w-56 h-56 rounded-full bg-gold/[0.03] blur-3xl pointer-events-none" />
 
-        {/* Background decoration */}
-        <div className="absolute inset-0 bg-gradient-to-br from-navy via-navy-light to-navy-dark opacity-90" />
-        <div className="absolute top-20 right-20 w-96 h-96 rounded-full bg-gold/5 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-20 left-10 w-72 h-72 rounded-full bg-gold/5 blur-3xl pointer-events-none" />
-        <div className="absolute top-1/2 right-1/3 w-56 h-56 rounded-full bg-gold/[0.03] blur-3xl pointer-events-none" />
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 md:py-32">
+        <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
 
-        {/* Main content grid */}
-        <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
-          <div className="grid items-center">
-
-            {/* ── Left column: text + CTA ── */}
-            <div>
-              <div className="flex gap-3 mb-8">
-                <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-gold border border-gold/30">
-                  {t.hero.badge1}
-                </span>
-                <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-white/70 border border-white/20">
-                  {t.hero.badge2}
-                </span>
-              </div>
-
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6 whitespace-pre-line">
-                {t.hero.headline}
-              </h1>
-
-              <p className="text-lg text-white/70 leading-relaxed mb-10 max-w-2xl whitespace-pre-line">
-                {t.hero.description}
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                <Link
-                  href="/register"
-                  className="px-8 py-4 bg-gold text-navy font-semibold rounded-lg hover:bg-gold-light transition-colors text-base"
-                >
-                  {t.hero.cta}
-                </Link>
-                <span className="text-sm text-white/50 self-center">
-                  {t.hero.ctaSub}
-                </span>
-              </div>
-
-              {/* Scroll hint */}
-              <div className="mt-12 flex items-center gap-2 text-white/30">
-                <svg
-                  className="w-4 h-4 animate-bounce"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                </svg>
-                <span className="text-xs">스크롤하며 체험해보세요</span>
-              </div>
+          {/* ── Left column: text + CTA ── */}
+          <div>
+            <div className="flex flex-wrap gap-3 mb-8">
+              <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-gold border border-gold/30">
+                {t.hero.badge1}
+              </span>
+              <span className="px-3 py-1 text-xs rounded-full bg-white/10 text-white/70 border border-white/20">
+                {t.hero.badge2}
+              </span>
             </div>
 
-            {/* ── Right column: phone mockup with frame canvas (hidden) ── */}
-            <div className="hidden justify-center items-center">
-              <div className="relative">
-                {/* Ambient glow behind phone */}
-                <div className="absolute -inset-10 bg-gold/8 blur-3xl rounded-full pointer-events-none" />
+            <h1 className="text-display-lg text-white leading-tight mb-6 whitespace-pre-line">
+              {t.hero.headline}
+            </h1>
 
-                {/* Phone body */}
-                <div
-                  className="relative rounded-[44px] bg-black"
-                  style={{
-                    width: "260px",
-                    border: "8px solid rgba(255,255,255,0.14)",
-                    boxShadow:
-                      "0 32px 80px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,255,255,0.12)",
-                  }}
-                >
-                  {/* Dynamic island */}
-                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-7 bg-black rounded-full z-20" />
+            <p className="text-lg text-white/70 leading-relaxed mb-10 max-w-xl whitespace-pre-line">
+              {t.hero.description}
+            </p>
 
-                  {/* Screen */}
-                  <div className="rounded-[36px] overflow-hidden bg-black relative">
-                    <canvas
-                      ref={canvasRef}
-                      width={360}
-                      height={640}
-                      className="w-full block"
-                    />
-                    {/* Loading overlay */}
-                    {!framesLoaded && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-navy-dark gap-3">
-                        <div className="w-8 h-8 border-2 border-gold/60 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-white/30 text-xs">로딩 중…</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Home indicator */}
-                  <div className="flex justify-center py-2.5">
-                    <div className="w-24 h-1 bg-white/20 rounded-full" />
-                  </div>
-                </div>
-
-                {/* Volume / power buttons (decorative chrome detail) */}
-                <div className="absolute left-[-9px] top-[100px] w-[5px] h-7 bg-white/15 rounded-l-md" />
-                <div className="absolute left-[-9px] top-[140px] w-[5px] h-10 bg-white/15 rounded-l-md" />
-                <div className="absolute left-[-9px] top-[192px] w-[5px] h-10 bg-white/15 rounded-l-md" />
-                <div className="absolute right-[-9px] top-[132px] w-[5px] h-14 bg-white/15 rounded-r-md" />
-              </div>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <Link
+                href="/register"
+                className="px-8 py-4 bg-gold text-navy font-semibold rounded-full hover:bg-gold-light transition-colors text-base"
+              >
+                {t.hero.cta}
+              </Link>
+              <span className="text-sm text-white/50 self-center">
+                {t.hero.ctaSub}
+              </span>
             </div>
-
           </div>
-        </div>
 
-        {/* Bottom scroll arrow */}
-        <div className="absolute bottom-7 left-1/2 -translate-x-1/2 animate-bounce">
-          <svg className="w-6 h-6 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
+          {/* ── Right column: analysis result dashboard card ── */}
+          <div className="flex justify-center md:justify-end">
+            <div className="w-full max-w-sm bg-white rounded-2xl shadow-[0_32px_80px_rgba(0,0,0,0.35)] overflow-hidden">
+
+              {/* Browser chrome */}
+              <div className="flex items-center gap-1.5 px-4 py-3 bg-navy-dark border-b border-white/10">
+                <div className="w-2.5 h-2.5 rounded-full bg-nogo/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-gold/70" />
+                <div className="w-2.5 h-2.5 rounded-full bg-go/70" />
+                <span className="ml-3 text-[10px] text-white/40 font-mono">분석 결과 — 모이스처 크림</span>
+              </div>
+
+              {/* CONDITIONAL GO verdict */}
+              <div className="px-5 py-4 bg-cgo-bg border-b border-cgo/20 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold text-text-muted uppercase tracking-widest mb-0.5">최종 판정</p>
+                  <p className="text-xl font-black text-cgo">CONDITIONAL GO</p>
+                  <p className="text-xs text-text-muted mt-0.5">조건부 출시 가능</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-text-muted">성공 확률</p>
+                  <p className="text-3xl font-black text-cgo">72%</p>
+                  <p className="text-[10px] text-text-muted">응답자 42명</p>
+                </div>
+              </div>
+
+              {/* Kill Signal bars */}
+              <div className="px-5 py-3.5 border-b border-border">
+                <p className="text-[10px] font-semibold text-text-muted uppercase tracking-widest mb-2.5">Kill Signal 모니터</p>
+                {KS_ITEMS.map((ks) => (
+                  <div key={ks.l} className="mb-2 last:mb-0">
+                    <div className="flex justify-between text-[11px] mb-1">
+                      <span className="text-text">{ks.l}</span>
+                      <span className={
+                        ks.lv === "danger" ? "text-nogo font-semibold" :
+                        ks.lv === "warning" ? "text-cgo font-semibold" :
+                        "text-go font-semibold"
+                      }>
+                        {ks.p}%
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-surface-dark rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${
+                          ks.lv === "danger" ? "bg-nogo" :
+                          ks.lv === "warning" ? "bg-cgo" :
+                          "bg-go"
+                        }`}
+                        style={{ width: `${Math.min(ks.p * 4, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Core metrics 3-col */}
+              <div className="px-5 py-3.5 grid grid-cols-3 gap-2">
+                {METRICS.map((s) => (
+                  <div key={s.l} className="bg-surface rounded-lg p-2.5 text-center">
+                    <p className="text-[9px] text-text-muted mb-1">{s.l}</p>
+                    <p className="text-base font-black text-navy">{s.v}</p>
+                    <p className="text-[9px] text-text-muted">/ 4.0</p>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
+    </section>
   );
 }

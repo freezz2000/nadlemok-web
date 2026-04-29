@@ -62,3 +62,8 @@
   background-image: radial-gradient(circle, rgba(27,42,74,0.055) 1px, transparent 1px);
   background-size: 28px 28px;
 }
+
+/* 디스플레이급 타이포그래피 */
+.text-display-xl { font-size: 56px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; }
+.text-display-lg { font-size: 48px; line-height: 1.1;  letter-spacing: -0.02em; font-weight: 700; }
+.text-display-md { font-size: 36px; line-height: 1.15; letter-spacing: -0.015em; font-weight: 600; }
