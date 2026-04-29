@@ -66,6 +66,8 @@ export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const supabase = createClient()
+  const [activeTab, setActiveTab] = useState<'overview' | 'survey' | 'panels' | 'responses'>('overview')
+
   const [project, setProject] = useState<Project | null>(null)
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [templates, setTemplates] = useState<SurveyTemplate[]>([])
@@ -109,8 +111,8 @@ export default function ProjectDetailPage() {
   // 패널 섹션 토글 (analyzing/completed 상태에서 접힘)
   const [panelSectionOpen, setPanelSectionOpen] = useState(true)
 
-  // 분석 응답 데이터 (analyzing/completed 상태)
-  const [surveyResponses, setSurveyResponses] = useState<{ panel_id: string; responses: Record<string, number>; open_weakness?: string; open_improvement?: string }[]>([])
+  // 분석 응답 데이터 (패널 있으면 항상 로드)
+  const [surveyResponses, setSurveyResponses] = useState<{ panel_id: string; responses: Record<string, number>; open_weakness?: string; open_improvement?: string; responded_at?: string; response_duration_sec?: number }[]>([])
 
   // 패널 상세 팝업
   const [panelDetail, setPanelDetail] = useState<PanelDetail | null>(null)
@@ -168,6 +170,24 @@ export default function ProjectDetailPage() {
       const ids = new Set(panelData.map((p) => p.panel_id))
       setMatchedPanelIds(ids)
       setSelectedPanelIds(new Set(ids))
+
+      // 패널이 있으면 항상 응답 데이터 로드 (상태 무관)
+      if (panelData.length > 0) {
+        const surveyId = survs[0].id
+        const { data: responses } = await supabase
+          .from('survey_responses')
+          .select('panel_id, responses, open_weakness, open_improvement, responded_at, response_duration_sec')
+          .eq('survey_id', surveyId)
+
+        setSurveyResponses(responses || [])
+
+        // 패널별 응답 횟수 맵 구성
+        const countMap: Record<string, number> = {}
+        for (const r of responses || []) {
+          countMap[r.panel_id] = (countMap[r.panel_id] ?? 0) + 1
+        }
+        setPanelResponseMap(countMap)
+      }
     } else {
       setMatchedPanelIds(new Set())
       setSelectedPanelIds(new Set())
@@ -183,21 +203,8 @@ export default function ProjectDetailPage() {
       setAvailablePanels((allPanels as unknown as AvailablePanel[]) || [])
     }
 
-    // testing 상태: 패널별 응답 횟수 로드 + 교체 가능 패널 목록
-    if (proj?.status === 'testing' && survs?.length) {
-      const surveyId = survs[0].id
-      const { data: responses } = await supabase
-        .from('survey_responses')
-        .select('panel_id')
-        .eq('survey_id', surveyId)
-
-      const countMap: Record<string, number> = {}
-      for (const r of responses || []) {
-        countMap[r.panel_id] = (countMap[r.panel_id] ?? 0) + 1
-      }
-      setPanelResponseMap(countMap)
-
-      // 전체 패널 중 현재 매칭되지 않은 패널만 교체 후보로
+    // testing 상태: 교체 가능 패널 목록 로드
+    if (proj?.status === 'testing') {
       const { data: allPanels } = await supabase
         .from('profiles')
         .select('id, name, panel_profiles(*)')
@@ -206,14 +213,8 @@ export default function ProjectDetailPage() {
       setTestingAvailablePanels((allPanels as unknown as AvailablePanel[]) || [])
     }
 
-    // analyzing/analyzed/completed 상태: 전체 응답 로드 + 패널 섹션 접기
-    if ((proj?.status === 'analyzing' || proj?.status === 'analyzed' || proj?.status === 'completed') && survs?.length) {
-      const surveyId = survs[0].id
-      const { data: responses } = await supabase
-        .from('survey_responses')
-        .select('panel_id, responses, open_weakness, open_improvement')
-        .eq('survey_id', surveyId)
-      setSurveyResponses(responses || [])
+    // analyzing/completed 상태: 패널 섹션 접기
+    if (proj?.status === 'analyzing' || proj?.status === 'analyzed' || proj?.status === 'completed') {
       setPanelSectionOpen(false)
     }
   }
@@ -544,6 +545,32 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
+      {/* 탭 내비게이션 */}
+      <div className="flex border-b border-border mb-6">
+        {([
+          { key: 'overview', label: '개요' },
+          { key: 'survey', label: `설문${surveys.length > 0 ? ` (${surveys.length})` : ''}` },
+          { key: 'panels', label: `패널${matchedPanels.length > 0 ? ` (${matchedPanels.length})` : ''}` },
+          { key: 'responses', label: `답변${surveyResponses.length > 0 ? ` (${surveyResponses.length})` : ''}` },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-5 py-3 text-sm font-medium transition-all border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? 'border-navy text-navy'
+                : 'border-transparent text-text-muted hover:text-text hover:border-border'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── 개요 탭 ── */}
+      {activeTab === 'overview' && (
+      <div className="space-y-6">
+
       {/* 패널 매칭 대기 안내 */}
       {project.status === 'matching' && (
         <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
@@ -671,6 +698,12 @@ export default function ProjectDetailPage() {
           </p>
         )}
       </Card>
+
+      </div>)} {/* /개요 탭 — 설정 */}
+
+      {/* ── 설문 탭 ── */}
+      {activeTab === 'survey' && (
+      <div className="space-y-6">
 
       {/* 설문 목록 */}
       <Card>
@@ -874,6 +907,12 @@ export default function ProjectDetailPage() {
         </Card>
       )}
 
+      </div>)} {/* /설문 탭 */}
+
+      {/* ── 패널 탭 ── */}
+      {activeTab === 'panels' && (
+      <div className="space-y-6">
+
       {/* 패널 매칭 — recruiting 상태일 때 인라인 매칭 UI */}
       {project.status === 'recruiting' && (() => {
         const tc = (project as unknown as { target_cohort?: { genders: string[]; ageGroups: string[]; skinTypes: string[] } })?.target_cohort
@@ -1065,10 +1104,8 @@ export default function ProjectDetailPage() {
         const isTesting = project.status === 'testing'
         const isAnalyzing = project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed'
 
-        // 전체 설문 진행률 계산 (1회 이상 응답한 패널 수)
-        const respondedCount = isTesting
-          ? matchedPanels.filter((mp) => (panelResponseMap[mp.panel_id] ?? 0) > 0).length
-          : 0
+        // 전체 설문 진행률 계산 (1회 이상 응답한 패널 수) — 상태 무관
+        const respondedCount = matchedPanels.filter((mp) => (panelResponseMap[mp.panel_id] ?? 0) > 0).length
         const progressPct = matchedPanels.length > 0 ? Math.round((respondedCount / matchedPanels.length) * 100) : 0
 
         return (
@@ -1135,7 +1172,7 @@ export default function ProjectDetailPage() {
             {panelSectionOpen && <>
 
             {/* testing 상태: 전체 진행률 요약 */}
-            {isTesting && (
+            {(
               <div className="mb-5 p-4 bg-surface rounded-xl border border-border">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-text">전체 설문 진행률</span>
@@ -1177,7 +1214,7 @@ export default function ProjectDetailPage() {
                   <TableHead>피부고민</TableHead>
                   <TableHead>매칭일</TableHead>
                   <TableHead>상태</TableHead>
-                  {isTesting && <TableHead className="text-center">설문 진행</TableHead>}
+                  <TableHead className="text-center">응답여부</TableHead>
                   {isTesting && testingEditMode && <TableHead className="text-center">제거</TableHead>}
                 </TableRow>
               </TableHeader>
@@ -1185,16 +1222,15 @@ export default function ProjectDetailPage() {
                 {matchedPanels.map((mp) => {
                   const p = mp.panel
                   const pp = p?.panel_profiles
-                  const responseCount = isTesting ? (panelResponseMap[mp.panel_id] ?? 0) : 0
+                  const responseCount = panelResponseMap[mp.panel_id] ?? 0
                   const hasResponded = responseCount > 0
-                  const isComplete = responseCount >= 1
 
                   const isDropped = testingDropIds.has(mp.panel_id)
 
                   return (
                     <TableRow key={mp.id} className={
                       isDropped ? 'opacity-40 line-through bg-nogo-bg/20' :
-                      isTesting && !hasResponded ? 'bg-nogo-bg/30' : ''
+                      !hasResponded ? 'bg-nogo-bg/30' : ''
                     }>
                       <TableCell>
                         <button
@@ -1212,25 +1248,26 @@ export default function ProjectDetailPage() {
                       <TableCell>
                         <MatchStatusBadge status={mp.status as PanelMatchStatus} />
                       </TableCell>
-                      {isTesting && (
-                        <TableCell className="text-center">
-                          {hasResponded ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-go">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              응답 완료
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-nogo">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                              미응답
-                            </span>
-                          )}
-                        </TableCell>
-                      )}
+                      <TableCell className="text-center">
+                        {hasResponded ? (
+                          <button
+                            onClick={() => openPanelSurvey(mp.panel_id, p?.name || '')}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-go hover:underline"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            완료
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-nogo">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            미응답
+                          </span>
+                        )}
+                      </TableCell>
                       {isTesting && testingEditMode && (
                         <TableCell className="text-center">
                           <button
@@ -1366,8 +1403,10 @@ export default function ProjectDetailPage() {
         )
       })()}
 
-      {/* 분석 결과 — analyzing/analyzed/completed 상태 */}
-      {(project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed') && surveys.length > 0 && (() => {
+      </div>)} {/* /패널 탭 */}
+
+      {/* ── 개요 탭 — 분석 결과 ── */}
+      {activeTab === 'overview' && (project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed') && surveys.length > 0 && (() => {
         const analysis = computeAnalysis()
         if (!analysis) {
           return (
@@ -1563,6 +1602,115 @@ export default function ProjectDetailPage() {
         )
       })()}
 
+      {/* ── 답변 탭 ── */}
+      {activeTab === 'responses' && (() => {
+        const questions: SurveyQuestion[] = surveys[0]?.questions || []
+        const scaleQuestions = questions.filter((q) => q.type === 'scale')
+
+        function fmtDuration(sec?: number) {
+          if (!sec) return '-'
+          const m = Math.floor(sec / 60)
+          const s = sec % 60
+          return m > 0 ? `${m}분 ${s}초` : `${s}초`
+        }
+
+        function avgScore(responses: Record<string, number>) {
+          const vals = Object.values(responses).filter((v) => v != null && typeof v === 'number')
+          if (!vals.length) return null
+          return vals.reduce((a, b) => a + b, 0) / vals.length
+        }
+
+        function ksTriggeredCount(responses: Record<string, number>) {
+          return questions.filter((q) => {
+            if (!q.isKillSignal || q.type !== 'scale') return false
+            const v = responses[q.key]
+            return v != null && v >= 3
+          }).length
+        }
+
+        return (
+          <div>
+            <Card>
+              <CardTitle>패널별 답변 현황</CardTitle>
+              {surveyResponses.length === 0 ? (
+                <p className="text-sm text-text-muted text-center py-10">
+                  아직 제출된 응답이 없습니다.
+                </p>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left font-medium text-text-muted text-xs py-2 pr-4">패널명</th>
+                        <th className="text-center font-medium text-text-muted text-xs py-2 px-3">응답문항</th>
+                        <th className="text-center font-medium text-text-muted text-xs py-2 px-3">평균점수</th>
+                        <th className="text-center font-medium text-text-muted text-xs py-2 px-3">KS 유발</th>
+                        <th className="text-center font-medium text-text-muted text-xs py-2 px-3">응답시간</th>
+                        <th className="text-left font-medium text-text-muted text-xs py-2 pl-3">아쉬운점</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {surveyResponses.map((sr) => {
+                        const mp = matchedPanels.find((p) => p.panel_id === sr.panel_id)
+                        const panelName = mp?.panel?.name || sr.panel_id.slice(0, 8) + '...'
+                        const answeredCount = scaleQuestions.filter((q) => sr.responses[q.key] != null).length
+                        const avg = avgScore(sr.responses)
+                        const ksCount = ksTriggeredCount(sr.responses)
+                        const preview = sr.open_weakness
+                          ? (sr.open_weakness.length > 30 ? sr.open_weakness.slice(0, 30) + '…' : sr.open_weakness)
+                          : '-'
+                        return (
+                          <tr
+                            key={sr.panel_id}
+                            className="border-b border-border/50 hover:bg-surface/60 cursor-pointer transition-colors"
+                            onClick={() => openPanelSurvey(sr.panel_id, panelName)}
+                          >
+                            <td className="py-3 pr-4">
+                              <button className="font-medium text-navy hover:underline text-left text-sm">
+                                {panelName}
+                              </button>
+                            </td>
+                            <td className="py-3 px-3 text-center text-xs">
+                              {answeredCount} / {scaleQuestions.length}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {avg != null ? (
+                                <span className={`text-xs font-semibold ${
+                                  avg >= 3.5 ? 'text-go' : avg >= 3.0 ? 'text-navy' : avg >= 2.5 ? 'text-cgo' : 'text-nogo'
+                                }`}>
+                                  {avg.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-text-muted">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {ksCount > 0 ? (
+                                <span className="text-xs font-semibold text-nogo bg-nogo-bg px-2 py-0.5 rounded-full">
+                                  {ksCount}건
+                                </span>
+                              ) : (
+                                <span className="text-xs text-go">없음</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center text-xs text-text-muted">
+                              {fmtDuration(sr.response_duration_sec)}
+                            </td>
+                            <td className="py-3 pl-3 text-xs text-text-muted truncate max-w-[180px]">
+                              {preview}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )
+      })()}
+
       {/* 패널 상세 팝업 */}
       <Modal
         open={panelDetail !== null || loadingPanelDetail}
@@ -1674,8 +1822,8 @@ export default function ProjectDetailPage() {
                 </span>
               </div>
 
-              {/* 설문 응답 보기 버튼 — testing/analyzing/analyzed/completed 상태일 때만 */}
-              {(project.status === 'testing' || project.status === 'analyzing' || project.status === 'analyzed' || project.status === 'completed') && surveys.length > 0 && (
+              {/* 설문 응답 보기 버튼 — 응답 데이터가 있을 때 */}
+              {surveyResponses.some((r) => r.panel_id === panelDetail.id) && surveys.length > 0 && (
                 <>
                   <hr className="border-border" />
                   <button
