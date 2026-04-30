@@ -10,6 +10,7 @@ const errorMessages: Record<string, string> = {
   oauth: '소셜 로그인에 실패했습니다. 다시 시도해주세요.',
   naver_failed: '네이버 로그인에 실패했습니다. 다시 시도해주세요.',
   naver_no_email: '네이버 계정에서 이메일 정보를 가져올 수 없습니다.',
+  naver_not_configured: '네이버 로그인이 아직 설정되지 않았습니다. 관리자에게 문의해주세요.',
 }
 
 function LoginContent() {
@@ -72,11 +73,10 @@ function LoginContent() {
         <div className="bg-white rounded-xl border border-border shadow-sm p-8">
           {/* 소셜 로그인 */}
           <div className="space-y-2.5 mb-6">
-            {/* 네이버 버튼 임시 숨김
             <button
               type="button"
               onClick={() => { window.location.href = '/api/auth/naver' }}
-              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+              className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors hover:brightness-95"
               style={{ backgroundColor: '#03C75A' }}
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
@@ -84,7 +84,6 @@ function LoginContent() {
               </svg>
               네이버로 로그인
             </button>
-            */}
 
             <button
               type="button"

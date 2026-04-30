@@ -106,13 +106,12 @@ export default function RegisterPage() {
 
             {/* 소셜 가입 */}
             <div className="space-y-2">
-              {/* 네이버 버튼 임시 숨김
               <button
                 type="button"
                 onClick={() => {
                   window.location.href = `/api/auth/naver?role=${role}&next=${role === 'panel' ? '/register/panel' : '/client'}`
                 }}
-                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
+                className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-colors hover:brightness-95"
                 style={{ backgroundColor: '#03C75A' }}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
@@ -120,7 +119,6 @@ export default function RegisterPage() {
                 </svg>
                 네이버로 가입하기
               </button>
-              */}
 
               <button
                 type="button"
